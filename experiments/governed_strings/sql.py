@@ -79,8 +79,12 @@ class GovernedCursor:
 
 
 class GovernedSQL:
-    def __init__(self, database, *, gateway, consumer, edition_publisher, directory, detect_types=0):
+    def __init__(self, database, *, gateway, consumer, edition_publisher, directory, detect_types=0,
+                 batch_size=64):
+        if type(batch_size) is not int or not 1 <= batch_size <= 64:
+            raise ValueError("SQL publication batch size must be between 1 and 64")
         self.database = Path(database).resolve()
+        self.batch_size = batch_size
         self.detect_types = detect_types
         self.gateway, self.consumer, self.edition_publisher = gateway, consumer, edition_publisher
         self.directory = Path(directory)
@@ -124,30 +128,39 @@ class GovernedSQL:
             self.executions.append({"query_id": query_id, "rows": len(raw_rows),
                                     "assignment_id": resolution.assignment_id})
             self.consumer.resolver.resolve(table, columns, actor=self.consumer.actor,
-                application=self.consumer.application, purpose=self.consumer.purpose, expected_source=identity)
-            rows = []
-            for index, raw in enumerate(raw_rows):
-                values = []
-                for column, content in zip(columns, raw, strict=True):
-                    if type(content).__name__ != resolution.columns[column]["kind"]:
-                        raise TypeError("SQL type differs from its signed column assignment")
-                    source = {"table": table, "column": column, "row": index,
+                application=self.consumer.application, purpose=self.consumer.purpose, expected_source=identity,
+                packet=resolution.packet)
+            rows = [[None] * len(columns) for _ in raw_rows]
+            publications, handles, positions = [], [], []
+            for start in range(0, len(raw_rows), self.batch_size):
+                for column_index, column in enumerate(columns):
+                    cells = []
+                    for index in range(start, min(start + self.batch_size, len(raw_rows))):
+                        content = raw_rows[index][column_index]
+                        if type(content).__name__ != resolution.columns[column]["kind"]:
+                            raise TypeError("SQL type differs from its signed column assignment")
+                        source = {"table": table, "column": column, "row": index,
                               "query_id": query_id, "assignment_id": resolution.assignment_id,
                               "snapshot_sha256": identity["snapshot_sha256"]}
+                        cells.append((content, source))
                     policy = resolution.policies[column]
-                    value = gateway.originate(content, policy, source=source,
-                                              request=request, decision_id=decision, call_id=query_id)
-                    edition = self.edition_publisher.publish_edition(value, policy=policy, source=source,
-                        directory=self.directory / query_id / f"{index}-{column}",
-                        application=self.consumer.application, purpose=self.consumer.purpose)
-                    self.consumer.resolver.admit_edition(edition, self.consumer)
-                    value = self.consumer.hydrate(value.reference, value.decision_id, value.result_id,
-                                                  kind=type(content).__name__)
-                    self.editions.append(edition)
-                    self.published_values.append(value)
-                    values.append(value)
-                rows.append(tuple(values))
-            return GovernedCursor(columns, rows)
+                    values = gateway.originate_batch(cells, policy, request=request,
+                                                      decision_id=decision, call_id=query_id)
+                    publications.append((values[0], policy, cells[0][1]))
+                    for value, (content, source) in zip(values, cells, strict=True):
+                        handles.append((value.reference, value.decision_id, value.result_id, type(content).__name__))
+                        positions.append((source["row"], column_index))
+            if publications:
+                editions = self.edition_publisher.publish_query_editions(query_id, publications,
+                    directory=self.directory / query_id, application=self.consumer.application,
+                    purpose=self.consumer.purpose)
+                for info, transport in editions:
+                    self.consumer.resolver.admit_edition(info, self.consumer, transport=transport)
+                    self.editions.append(info)
+                for position, value in zip(positions, self.consumer.hydrate_many(handles), strict=True):
+                    rows[position[0]][position[1]] = value
+                self.published_values.extend(value for row in rows for value in row)
+            return GovernedCursor(columns, [tuple(row) for row in rows])
         except Exception as exc:
             gateway._append("Failure", request, query_id,
                              {"decision_id": decision, "error_type": type(exc).__name__})

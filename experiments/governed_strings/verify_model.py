@@ -63,7 +63,7 @@ def verify_model(root, run, records, by_id, rules, nodes, bindings, store, catal
     source = resolve(key[0]).object
     require(source.id == model["input_object_id"] and sha(source.forward()) == hd["input_wire_sha256"],
             "handoff input differs from the retained wire")
-    revisions = nodes[key[0]]["policy_revisions"]
+    revisions = nodes[key]["policy_revisions"]
     dd = decision.body["details"]
     require(set(revisions) == {p["revision"] for p in dd["policies"]}
             and set(bindings[key]["claims"]) == set(dd["considered_claims"]),
@@ -195,8 +195,10 @@ def verify_model(root, run, records, by_id, rules, nodes, bindings, store, catal
         parser.close()
         visible = " ".join("".join(parser.parts).split())
         require(all(" ".join(n.split()) in visible for n in notices), "required notice is absent from plain report text")
-    edges = [{"parent": source.id, "child": t.id, "operation": section["required_tool"]} for t in release.tool_objects]
-    edges += [{"parent": obj.id, "child": release.output_object.id, "operation": "generate_report"}
+    source_node_id = nodes[key]["id"]
+    edges = [{"parent": source_node_id, "child": t.id, "operation": section["required_tool"]} for t in release.tool_objects]
+    edges += [{"parent": source_node_id if obj.id == source.id else obj.id,
+               "child": release.output_object.id, "operation": "generate_report"}
               for obj in (source, *release.tool_objects)]
     result = {"completed": True, "input_object_id": source.id, "output_object_id": release.output_object.id,
               "tool_object_ids": [o.id for o in release.tool_objects], "required_disclosure": notice,

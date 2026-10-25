@@ -30,6 +30,16 @@ def use_dict(use):
     return {name: getattr(use, name) for name in ("application", "purpose", "operation")}
 
 
+def _require_standalone_value(source, reference):
+    # The native endpoint selects whole sections. Sending a shared values
+    # section would include siblings absent from this primitive's handoff.
+    fields = source.envelope.get("values", {}).get("field_hashes", {})
+    if (reference.object_id != source.id or reference.group != "values"
+            or set(fields) != {reference.field}):
+        raise OperationDenied(
+            "The selected primitive must be materialized as a standalone governed value before model handoff.")
+
+
 def model_requirements(context, policies):
     """Resolve complete model conditions from the already verified assignments."""
     declarations = []
@@ -112,6 +122,7 @@ class NativeModelEndpoint:
             if requirements != self.requirements or digest(self.runtime_config) != self.runtime_digest:
                 raise OperationDenied("model endpoint configuration changed after preparation")
             source = context.store_object(value.reference.object_id)
+            _require_standalone_value(source, value.reference)
             handoff = context._append("ModelHandoff", request, call_id, {
                 "decision_id": decision, "subject": value.reference.to_dict(),
                 "delivery": "prepared-for-submit", "native_use": use_dict(self.use),
@@ -163,11 +174,12 @@ class NativeModelEndpoint:
 def prepare_native_model(value, *, context, input_session, output_session, recipient_session,
                          input_config, output_config, directory, model, binary, translate=str):
     """Compile carried requirements into the native endpoint's configuration."""
+    source = context.store_object(value.reference.object_id)
+    _require_standalone_value(source, value.reference)
+    metadata, _, _ = context._metadata(value)
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     input_config, output_config = Path(input_config), Path(output_config)
-    source = context.store_object(value.reference.object_id)
-    metadata, _, _ = context._metadata(value)
     requirements = model_requirements(context, metadata.policies)
     model_use = tn.UseContext(**requirements["use"])
     recipient_use = tn.UseContext(**requirements["recipient_use"])

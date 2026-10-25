@@ -16,7 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 
 from .policy import CompiledPolicy
@@ -134,6 +134,38 @@ class UnityCatalogRegistry:
         self.get_edition(dataset, edition, record_id)
         return full
 
+    def register_editions(self, batch_id, editions, directory, *, create_namespace=True):
+        """Register exact source editions together and return their readback bytes.
+
+        Each item is (dataset, edition, record_id, bundle_directory). The bundles
+        remain ordinary signed edition bundles below one immutable index. Native
+        authority, use and artifact admission remains the recipient's responsibility.
+        """
+        name = "tn_query_" + _batch_digest(batch_id)
+        root = Path(directory).resolve()
+        requests = _write_edition_index(root, batch_id, editions)
+        if create_namespace:
+            self._ensure("/catalogs", {"name": self.catalog})
+            self._ensure("/schemas", {"name": self.schema, "catalog_name": self.catalog})
+        self._ensure("/volumes", {
+            "catalog_name": self.catalog, "schema_name": self.schema,
+            "name": name, "volume_type": "EXTERNAL", "storage_location": root.as_uri(),
+        })
+        full = f"{self.catalog}.{self.schema}.{name}"
+        actual = self._request("GET", f"/volumes/{full}")
+        actual_root = _local_path(actual.get("storage_location", ""), full).resolve()
+        if actual_root != root:
+            raise PolicyDenied("immutable query volume already points to another bundle")
+        return _load_editions(requests, batch_id, actual_root)
+
+    def get_editions(self, requests, *, batch_id):
+        """Resolve a query's requested editions with one current catalog lookup."""
+        requests = _edition_requests(requests)
+        full = f"{self.catalog}.{self.schema}.tn_query_{_batch_digest(batch_id)}"
+        volume = self._request("GET", f"/volumes/{full}")
+        root = _local_path(volume.get("storage_location", ""), full)
+        return _load_editions(requests, batch_id, root)
+
     def register_feed(self, name, bundle_dir):
         """Publish a governed feed bundle as a UC external volume (setup step)."""
         self._ensure("/catalogs", {"name": self.catalog})
@@ -245,6 +277,24 @@ class LocalRegistry:
                          json.dumps(value, sort_keys=True).encode("utf-8"))
         return record_id
 
+    def register_editions(self, batch_id, editions, directory, *, create_namespace=True):
+        """Retain the same explicit batch lookup used by the Unity adapter."""
+        digest = _batch_digest(batch_id)
+        root = Path(directory).resolve()
+        requests = _write_edition_index(root, batch_id, editions)
+        value = {"batch_id": batch_id, "directory": str(root)}
+        _immutable_write(self.root / "batches" / f"{digest}.json",
+                         json.dumps(value, sort_keys=True).encode("utf-8"))
+        return self.get_editions(requests, batch_id=batch_id)
+
+    def get_editions(self, requests, *, batch_id):
+        requests = _edition_requests(requests)
+        path = self.root / "batches" / f"{_batch_digest(batch_id)}.json"
+        value = json.loads(path.read_bytes())
+        if value.get("batch_id") != batch_id:
+            raise PolicyDenied("immutable query index does not match the requested batch")
+        return _load_editions(requests, batch_id, Path(value["directory"]))
+
     def register_release(self, name, delta_path, columns):
         releases = self._index("releases.json")
         releases[name] = {"path": str(Path(delta_path).resolve()),
@@ -311,6 +361,83 @@ def _immutable_write(path, content):
                 raise PolicyDenied(f"immutable edition bundle differs: {path.name}") from None
     finally:
         Path(temporary).unlink(missing_ok=True)
+
+
+def _batch_digest(batch_id):
+    if not isinstance(batch_id, str) or not batch_id or len(batch_id.encode("utf-8")) > 256:
+        raise PolicyDenied("query batch identity requires a nonempty string of at most 256 bytes")
+    return hashlib.sha256(batch_id.encode("utf-8")).hexdigest()
+
+
+def _edition_requests(requests):
+    requests = list(requests)
+    if not requests or len(requests) > 1024:
+        raise PolicyDenied("query index requires between 1 and 1024 edition requests")
+    result, seen = [], set()
+    for request in requests:
+        if (not isinstance(request, (tuple, list)) or len(request) != 3
+                or any(not isinstance(value, str) or not value for value in request)):
+            raise PolicyDenied("edition request requires dataset, edition and exact record identity")
+        dataset, edition, record_id = request
+        _digest(record_id)
+        if record_id in seen:
+            raise PolicyDenied("query edition requests must have unique record identities")
+        seen.add(record_id)
+        result.append((dataset, edition, record_id))
+    return tuple(result)
+
+
+def _index_bundle(root, relative):
+    if (not isinstance(relative, str) or not relative or "\\" in relative or ":" in relative
+            or relative.startswith("/") or any(part in {"", ".", ".."} for part in relative.split("/"))):
+        raise PolicyDenied("query edition bundle must be a relative descendant path")
+    path = (root / PurePosixPath(relative)).resolve()
+    if not path.is_relative_to(root) or path == root:
+        raise PolicyDenied("query edition bundle is outside its registered directory")
+    return path
+
+
+def _write_edition_index(root, batch_id, editions):
+    _batch_digest(batch_id)
+    editions = list(editions)
+    if any(not isinstance(item, (tuple, list)) or len(item) != 4 for item in editions):
+        raise PolicyDenied("query registration requires edition identities and bundle directories")
+    requests = _edition_requests([item[:3] for item in editions])
+    records = []
+    for (dataset, edition, record_id), item in zip(requests, editions, strict=True):
+        directory = Path(item[3]).resolve()
+        if not directory.is_relative_to(root) or directory == root:
+            raise PolicyDenied("query edition bundle must be within its registered directory")
+        relative = directory.relative_to(root).as_posix()
+        _index_bundle(root, relative)
+        _load_edition(dataset, edition, record_id, directory)
+        records.append({"dataset": dataset, "edition": edition, "record_id": record_id,
+                        "bundle": relative})
+    manifest = {"schema": "tn.dataset.edition-index.v1", "batch_id": batch_id, "editions": records}
+    _immutable_write(root / "editions.json", json.dumps(manifest, sort_keys=True).encode("utf-8"))
+    return requests
+
+
+def _load_editions(requests, batch_id, root):
+    """Read untrusted locators; each recipient still admits the signed records."""
+    root = Path(root).resolve()
+    try:
+        manifest = json.loads((root / "editions.json").read_bytes())
+        if (not isinstance(manifest, dict) or manifest.get("schema") != "tn.dataset.edition-index.v1"
+                or manifest.get("batch_id") != batch_id):
+            raise PolicyDenied("query index identity does not match the requested batch")
+        records = manifest.get("editions")
+        if not isinstance(records, list) or any(not isinstance(item, dict) for item in records):
+            raise PolicyDenied("query index must contain edition locators")
+        identities = _edition_requests([(item.get("dataset"), item.get("edition"), item.get("record_id"))
+                                        for item in records])
+        paths = {identity: _index_bundle(root, item.get("bundle"))
+                 for identity, item in zip(identities, records, strict=True)}
+        if any(request not in paths for request in requests):
+            raise PolicyDenied("query index does not match every requested edition identity")
+        return tuple(_load_edition(*request, paths[request]) for request in requests)
+    except FileNotFoundError as error:
+        raise PolicyDenied("query edition index or bundle is incomplete") from error
 
 
 def write_edition_bundle(root, *, dataset, edition, record_id, edition_wire,

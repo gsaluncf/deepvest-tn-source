@@ -27,7 +27,7 @@ from tn_polars.support import Support
 from tn_polars.tn_boundary import PolicySet, TnBoundary, root_name
 
 from deepvest_tn.unity import FinanceEditionRequest, resolve_finance_editions
-from experiments.governed_strings.catalog import UnityGovernance, markdown
+from experiments.governed_strings.catalog import ReceivedEdition, UnityGovernance, markdown
 from experiments.governed_strings.evidence import EvidenceError
 from experiments.governed_strings.numeric import TNNumeric
 from experiments.governed_strings.numeric_codec import record_value
@@ -95,7 +95,7 @@ class DataframeGovernance(UnityGovernance):
             self._frame_artifacts[key] = artifacts, files
         return self._frame_artifacts[key]
 
-    def publish_edition(self, value, *, policy, source, directory, application, purpose):
+    def publish_edition(self, value, *, policy, source, directory, application, purpose, register=True):
         obj = tn.GovernedObject.read(io.BytesIO(self.store.get(value.reference.object_id)))
         dataset = source["table"] + "." + source["column"]
         edition = source["query_id"] + "-" + str(source["row"])
@@ -115,15 +115,17 @@ class DataframeGovernance(UnityGovernance):
             revision_wires=[(r, self.store.get(r)) for r in assignment["revisions"]],
             evaluators={policy.revision_id: files}, packed=True)
         # Source assignment publication and resolution have established this catalog and schema.
-        self.registry.register_edition(dataset, edition, record.id, bundle, create_namespace=False)
+        if register:
+            self.registry.register_edition(dataset, edition, record.id, bundle, create_namespace=False)
         return {"dataset": dataset, "edition": edition, "record_id": record.id,
                 "source_object_id": obj.id}
 
-    def admit_edition(self, info, context):
+    def admit_edition(self, info, context, *, transport=None):
         request = FinanceEditionRequest(info["dataset"], info["edition"], info["record_id"],
             tn.UseContext(context.application, context.purpose, "inspect-claims"))
         resolved = resolve_finance_editions([request], catalog_session=context.session,
-            policy_dag=self.policy_dag, trust=self.trust, registry=self.registry,
+            policy_dag=self.policy_dag, trust=self.trust,
+            registry=self.registry if transport is None else ReceivedEdition(info, transport),
             catalog=context.catalog, metadata_store=self.store)[0]
         context.editions[info["source_object_id"]] = resolved.selection.record
         context.frame_editions[info["source_object_id"]] = resolved
@@ -171,14 +173,13 @@ def _select_policies(context, metadata, values, use):
     # current edition checks and evaluator state, under this context and use.
     module_cache = OpaModuleCache()
     sources = {"name": set(), "value": set()}
-    editions, inputs = {}, []
+    editions, inputs, selected = {}, [], {}
     for index, ((data, primitive_binding, _), value) in enumerate(zip(metadata, values)):
         column = "name" if index % 2 == 0 else "value"
         bindings = data.dataset_bindings
         if len(bindings) != 1:
             raise EvidenceError("each input cell must retain exactly one original SQL edition")
         binding = bindings[0]
-        context.catalog.verify_binding(binding, context.policy_dag)
         resolved = context.frame_editions.get(binding.source_object_id)
         if resolved is None:
             raise EvidenceError("the cell's original evaluator edition was not resolved")
@@ -188,9 +189,12 @@ def _select_policies(context, metadata, values, use):
             raise EvidenceError("cell position differs from its signed source edition")
         if len(primitive_binding["origins"]) != 1 or primitive_binding["origins"][0]["column"] != column:
             raise EvidenceError("cell position differs from its retained SQL origin")
-        selection = context.catalog.select(record.dataset, record.edition, record.id, use)
-        current = PolicySet.for_selection(resolved.entries, selection, module_cache=module_cache)
-        policy_set = current if policy_set is None else policy_set.include(current)
+        if record.id not in selected:
+            context.catalog.verify_binding(binding, context.policy_dag)
+            selection = context.catalog.select(record.dataset, record.edition, record.id, use)
+            current = PolicySet.for_selection(resolved.entries, selection, module_cache=module_cache)
+            selected[record.id] = current
+            policy_set = current if policy_set is None else policy_set.include(current)
         root = root_name(binding.source_object_id, column)
         sources[column].add(root)
         editions[record.id] = {"dataset": record.dataset, "edition": record.edition,
@@ -198,18 +202,22 @@ def _select_policies(context, metadata, values, use):
             "contracts": [item.revision_id for item in record.contracts]}
         inputs.append({"row": index // 2, "column": column, "reference": value.reference.to_dict(),
                        "source_object_id": binding.source_object_id, "edition_record_id": record.id,
-                       "root": root})
+                       "source_row": primitive_binding["origins"][0]["row"], "root": root})
     return policy_set, sources, list(editions.values()), inputs
 
 
 def _row_support(lazy, cells, policies, row_count):
     """Bind row support to each cell publication, rather than one arbitrary input."""
-    columns, identities = [], {}
+    columns, identities, members = [], {}, {}
     for cell in cells:
         source = cell["source_object_id"]
+        if source not in members:
+            members[source] = [[] for _ in range(row_count)]
+        rows = members[source]
+        ordinal = cell["source_row"]
+        rows[cell["row"]].append(f"{source}::{ordinal}")
+    for source, rows in members.items():
         name = "__tn_support_" + uuid4().hex
-        # Each source publication contains one cell. Its local row ordinal is 0.
-        rows = [[source + "::0"] if row == cell["row"] else [] for row in range(row_count)]
         columns.append(pl.Series(name, rows, dtype=pl.List(pl.String)))
         identities[name] = source
     return Support(lazy.with_columns(columns), identities, {},

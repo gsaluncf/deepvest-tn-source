@@ -30,6 +30,13 @@ def ref_key(reference):
     return reference["object_id"], reference["group"], reference["field"]
 
 
+def reference_node_id(key):
+    """Identify a field without conflating siblings in the same publication."""
+    if key[1:] == ("values", "value"):
+        return key[0]
+    return key[0] + "#" + json.dumps(key[1:], ensure_ascii=True, separators=(",", ":"))
+
+
 def verify(root):
     root = Path(root).resolve()
     run = json.loads((root / "run.json").read_text())
@@ -201,13 +208,14 @@ def verify(root):
             for parent in binding["parents"]:
                 pk = ref_key(parent)
                 visit(pk)
-                parent_policies.update(nodes[pk[0]]["policy_revisions"])
+                parent_policies.update(nodes[pk]["policy_revisions"])
                 pb = bindings_by_key[pk]
                 parent_claims.update(pb["claims"])
                 for origin in pb["origins"]:
                     if origin not in parent_origins:
                         parent_origins.append(origin)
-                edges.append({"parent": pk[0], "child": key[0], "operation": rb["operation"]})
+                edges.append({"parent": reference_node_id(pk), "child": reference_node_id(key),
+                              "operation": rb["operation"]})
             actual_policies = {p.revision_id for p in working.policies}
             require(parent_claims <= set(binding["claims"]), "a derivative dropped a contributing claim")
             require(parent_claims == set(decision.body["details"]["considered_claims"]),
@@ -221,6 +229,8 @@ def verify(root):
                 source = binding["source"]
                 require(source is not None and rd["source"] == source and key[0] in source_editions,
                         "source primitive lacks its signed SQL origin or edition")
+                require(source_editions[key[0]].dataset == source["table"] + "." + source["column"],
+                        "source edition does not identify the assigned SQL column")
                 field = assignment["columns"][source["column"]]
                 require(actual_policies == {field["revision"]} and source["assignment_id"] == assignment_obj.id
                         and source["snapshot_sha256"] == assignment["source"]["snapshot_sha256"]
@@ -234,6 +244,12 @@ def verify(root):
                         and sql_records[0].body["details"]["source"] == assignment["source"]
                         and sql_records[0].body["details"]["assignment_id"] == assignment_obj.id,
                         "source publication does not follow its authorized SQL read")
+                row_count = sql_records[0].body["details"]["row_count"]
+                require(type(row_count) is int and type(source["row"]) is int
+                        and 0 <= source["row"] < row_count,
+                        "source primitive has an invalid SQL row ordinal")
+                require(key[1] == "values" and key[2] in {"value", "value_" + str(source["row"])},
+                        "source primitive SQL field differs from its signed row ordinal")
             for identity in binding["claims"]:
                 claim = by_id.get(identity)
                 require(claim is not None and claim.body["kind"] == "Claim", "unverifiable contributing claim")
@@ -241,7 +257,9 @@ def verify(root):
                     require(rb["operation"] == "attest" and claim.body["call_id"] == rb["call_id"]
                             and claim.writer == record.writer and claim.body["inputs"] == binding["parents"],
                             "new claim does not identify its original subjects and issuer")
-            nodes[key[0]] = {"id": key[0], "kind": binding["declared"]["kind"], "operation": rb["operation"],
+            nodes[key] = {"id": reference_node_id(key), "object_id": key[0], "group": key[1], "field": key[2],
+                            "reference": {"object_id": key[0], "group": key[1], "field": key[2]},
+                            "kind": binding["declared"]["kind"], "operation": rb["operation"],
                             "writer": obj.writer, "decision_id": decision.id, "result_id": record.id,
                             "policy_revisions": sorted(actual_policies), "claims": binding["claims"],
                             "source": binding["source"]}
@@ -253,7 +271,7 @@ def verify(root):
         native_lineage = {}
         for name, h in run["outputs"].items():
             key = ref_key(h["reference"])
-            require(results[key].id == h["result_id"] and nodes[key[0]]["decision_id"] == h["decision_id"],
+            require(results[key].id == h["result_id"] and nodes[key]["decision_id"] == h["decision_id"],
                     "exported handle cites different operation evidence")
             lineage = tn.LineageVerifier(max_objects=65536, max_depth=256).verify(view(key[0]), catalog, dag, view)
             native_lineage[name] = {"object_ids": lineage.object_ids, "source_object_ids": lineage.source_object_ids}
@@ -278,9 +296,10 @@ def verify(root):
         graph = {"nodes": list(nodes.values()), "edges": edges, "policy_edges": policy_edges}
     (root / "verification.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     (root / "dag.json").write_text(json.dumps(graph, indent=2), encoding="utf-8")
-    names = {identity: "n" + str(i) for i, identity in enumerate(nodes)}
+    names = {node["id"]: "n" + str(i) for i, node in enumerate(nodes.values())}
     mermaid = ["flowchart LR"]
-    for identity, node in nodes.items():
+    for node in nodes.values():
+        identity = node["id"]
         source = node["source"]
         label = (source["column"] + " row " + str(source["row"])) if source else node["operation"]
         mermaid.append(f'  {names[identity]}["{node["kind"]}: {label}<br/>{identity[7:17]}"]')
