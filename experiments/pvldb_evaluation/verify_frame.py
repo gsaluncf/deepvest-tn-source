@@ -18,7 +18,7 @@ import sqlite3
 import tn
 from tn_polars.opa import OpaWasmEvaluator
 
-from deepvest_tn.publications import PublicationStore, write_once
+from deepvest_tn.publications import open_publication_store, write_once
 from experiments.governed_strings.evidence import EvidenceError, verify_tape
 from experiments.governed_strings.primitives import SCHEMA, VALUE_TYPE
 from experiments.governed_strings.numeric_codec import decode, encode, record_value
@@ -57,7 +57,7 @@ def verify_frame(root):
     root = Path(root).resolve()
     run = json.loads((root / "run.json").read_text())
     _require(run["schema"] == "tn.primitive-run.v1", "unknown run schema")
-    store = PublicationStore(root / "publications")
+    store = open_publication_store(root / "publications", read_only=True)
     authority, writers = run["authority"], set(run["writers"])
     use = tn.UseContext(run["request"]["application"], run["request"]["purpose"], "verify")
 
@@ -66,7 +66,7 @@ def verify_frame(root):
         _require(obj.id == identity, "retained native publication identity differs")
         return obj
 
-    with tn.Session.from_config(str(root / run["observer_config"])) as session:
+    with store, tn.Session.from_config(str(root / run["observer_config"])) as session:
         admin = tn.Governance.from_markdown(authority, POLICY, ".tn/config/agents.md", "experiment.administration")
         audit = tn.Governance.from_markdown(authority, POLICY, ".tn/config/agents.md", "experiment.evidence")
         _require(admin.fields == run["administration_policy"] and audit.fields == run["audit_policy"],

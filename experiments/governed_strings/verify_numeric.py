@@ -17,18 +17,18 @@ from uuid import uuid4
 import tn
 from tn.governed import NotEntitled
 
-from deepvest_tn.publications import PublicationStore
+from deepvest_tn.publications import open_publication_store
 from . import Context, EvidenceRecorder, Assessment, Request, TNNumeric, OperationDenied
 from .evidence import verify_tape, EvidenceError
 from .numeric_codec import encode
 from .provision import provision
 
 
-def run(directory):
+def run(directory, *, storage="sqlite"):
     configs = provision(Path(directory) / 'sessions')
-    store = PublicationStore(Path(directory) / 'publications')
+    store = open_publication_store(Path(directory) / 'publications', backend=storage)
     checks = []
-    with tn.Session.from_config(str(configs['worker'])) as session:
+    with store, tn.Session.from_config(str(configs['worker'])) as session:
         policy = session.policy('experiment.administration')
         recorder = EvidenceRecorder(session, store, session.policy('experiment.evidence'))
         context = Context(session, recorder, lambda r: Assessment(True, 'local numeric verification'),
@@ -177,6 +177,7 @@ def run(directory):
         checks.append('independent signature and record-chain verification')
         checkpoint = recorder.export(Path(directory) / 'worker-records')
         return {'checks': checks, 'signed_records_verified': len(records), 'checkpoint': checkpoint,
+                'storage': storage,
                 'tn_version': importlib.metadata.version('tn-proto'),
                 'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                                   for p in Path(__file__).parent.glob('*.py')},
@@ -186,11 +187,13 @@ def run(directory):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-directory', type=Path)
+    parser.add_argument('--storage', choices=('files', 'sqlite'), default='sqlite',
+                        help='Publication storage (default: sqlite; files retains separate-file storage)')
     args = parser.parse_args()
     if args.run_directory:
-        result = run(args.run_directory)
+        result = run(args.run_directory, storage=args.storage)
         (args.run_directory / 'numeric-verification.json').write_text(json.dumps(result, indent=2))
     else:
         with TemporaryDirectory(prefix='tn-numeric-') as folder:
-            result = run(folder)
+            result = run(folder, storage=args.storage)
     print(json.dumps(result, indent=2))

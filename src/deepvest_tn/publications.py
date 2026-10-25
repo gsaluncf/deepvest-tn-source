@@ -43,10 +43,45 @@ def write_once(path: Path, content: bytes) -> None:
 class PublicationStore:
     """Append-only signed wire storage with an immutable, explicitly verified index."""
 
-    def __init__(self, root: Path | str) -> None:
+    def __init__(self, root: Path | str, *, read_only: bool = False) -> None:
         self.root = Path(root)
+        self.read_only = read_only
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
+    def close(self) -> None:
+        """The file backend has no persistent connection to close."""
+
+    def publication_sizes(self) -> dict[str, int]:
+        """Logical wire sizes for measurement, not a verification result."""
+        return {"sha256:" + p.stem: p.stat().st_size for p in (self.root / "objects").glob("*.tn")}
+
+    def put_record(self, snapshot, publication, *, context_id, sequence) -> None:
+        validate_record_position(context_id, sequence)
+        self.put(snapshot)
+        self.put(publication)
+        write_once(self.root / "tapes" / context_id / f"{sequence:08d}.ref",
+                   publication.id.encode("ascii"))
+
+    def record_ids(self, context_id) -> tuple[str, ...]:
+        validate_record_position(context_id, 1)
+        files = sorted((self.root / "tapes" / context_id).glob("*.ref"))
+        identities = []
+        for sequence, path in enumerate(files, 1):
+            if path.name != f"{sequence:08d}.ref":
+                raise ValueError("record sequence has a gap")
+            identity = path.read_text(encoding="ascii")
+            object_digest(identity)
+            identities.append(identity)
+        return tuple(identities)
 
     def put(self, object: tn.GovernedObject) -> str:
+        if self.read_only:
+            raise PermissionError("publication store is read-only")
         if not isinstance(object, tn.GovernedObject):
             raise TypeError("publication storage requires a native GovernedObject")
         wire = object.forward()
@@ -83,3 +118,26 @@ class PublicationStore:
         if publication.id != object_id or publication.forward() != wire:
             raise ValueError("retained publication has the wrong native identity")
         return publication
+
+
+def validate_record_position(context_id, sequence) -> None:
+    if not isinstance(context_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", context_id):
+        raise ValueError("invalid record context identity")
+    if type(sequence) is not int or sequence < 1:
+        raise ValueError("record sequence must be a positive integer")
+
+
+def open_publication_store(root, *, backend=None, read_only=False) -> PublicationStore:
+    """Select a storage backend explicitly, or reopen the format already on disk."""
+    root = Path(root)
+    has_database = (root / "publications.sqlite3").exists()
+    has_files = (root / "objects").exists() or (root / "index").exists()
+    if backend not in (None, "files", "sqlite") or (has_database and has_files):
+        raise ValueError("unknown or ambiguous publication storage backend")
+    selected = backend or ("sqlite" if has_database else "files")
+    if (selected == "files" and has_database) or (selected == "sqlite" and has_files):
+        raise ValueError("requested backend differs from existing publication storage")
+    if selected == "sqlite":
+        from .sqlite_publications import SQLitePublicationStore
+        return SQLitePublicationStore(root, read_only=read_only)
+    return PublicationStore(root, read_only=read_only)

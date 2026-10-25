@@ -133,17 +133,16 @@ class EvidenceRecorder:
             data = self.session.create(
                 {"record": body}, self.policy, object_type=EVIDENCE_TYPE, group="evidence",
             )
-            self.store.put(data.snapshot)
+            snapshot = data.snapshot
             publication = self.session.release(
                 data, use=tn.UseContext(application, purpose, "record-evidence"),
                 to="context-recorder", object_type=EVIDENCE_TYPE,
                 decide=lambda ctx: ctx.writer == self.session.did
                 and len(ctx.policies) == 1 and ctx.policies[0].matches_contract(self.policy),
             )
-            self.store.put(publication)
-            # A complete index entry is exposed only after its exact TN bytes exist.
-            path = self.store.root / "tapes" / self.context_id / f"{body['sequence']:08d}.ref"
-            write_once(path, publication.id.encode("ascii"))
+            # Return only after the publications and their sequence reference are durable.
+            self.store.put_record(snapshot, publication, context_id=self.context_id,
+                                  sequence=body["sequence"])
             self._ids.append(publication.id)
             return publication.id
 

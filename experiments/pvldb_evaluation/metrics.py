@@ -63,6 +63,7 @@ class Profiler:
         from experiments.governed_strings.primitives import Context
         from experiments.governed_strings.evidence import EvidenceRecorder
         from deepvest_tn.publications import PublicationStore
+        from deepvest_tn.sqlite_publications import SQLitePublicationStore
         from tn_polars.tn_boundary import PolicySet
         targets = [
             (Context, "_metadata", "primitive_metadata"),
@@ -71,6 +72,9 @@ class Profiler:
             (Context, "_publish", "value_publication"),
             (EvidenceRecorder, "append", "signed_record"),
             (PublicationStore, "put", "publication_persistence"),
+            (PublicationStore, "put_record", "record_persistence"),
+            (SQLitePublicationStore, "put", "publication_persistence"),
+            (SQLitePublicationStore, "put_record", "record_persistence"),
             (PolicySet, "decide", "dataframe_policy_evaluation"),
         ]
         try:

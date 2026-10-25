@@ -6,7 +6,13 @@ from types import SimpleNamespace
 import pytest
 import tn
 
-from deepvest_tn.publications import PublicationStore
+from deepvest_tn.publications import PublicationStore, open_publication_store
+
+
+@pytest.fixture(params=["files", "sqlite"])
+def governed_store(tmp_path, request):
+    with open_publication_store(tmp_path, backend=request.param) as store:
+        yield store
 
 POLICY = """---
 version: 1
@@ -139,14 +145,14 @@ def test_matching_index_hash_does_not_accept_a_changed_signed_publication(tmp_pa
         load(source.id)
 
 
-def test_native_read_preserves_wire_and_requires_a_new_use_decision(tmp_path):
+def test_native_read_preserves_wire_and_requires_a_new_use_decision(governed_store):
     with tn.Session(POLICY, groups=["finance"]) as session:
         data = session.create(
             {"amount": 42}, session.policy("portfolio.feed.data.v1"),
             object_type="portfolio.feed.data.v1", group="finance")
         source = session.release(data, use=tn.UseContext("source", "analysis", "publish"),
                                  to="analytics", decide=lambda context: True)
-        store = PublicationStore(tmp_path)
+        store = governed_store
         store.put(source)
         loaded = store.read(source.id)
         assert isinstance(loaded, tn.GovernedObject)
@@ -166,13 +172,13 @@ def test_native_read_preserves_wire_and_requires_a_new_use_decision(tmp_path):
         assert seen == ["calculate", "expose"]
 
 
-def test_record_read_rechecks_authority_after_loading_the_native_object(tmp_path):
+def test_record_read_rechecks_authority_after_loading_the_native_object(governed_store):
     from experiments.governed_strings.evidence import EvidenceError, EvidenceRecorder, read_record
 
     other_policy = POLICY.replace("portfolio.feed.data.v1", "another.policy")
     with tn.Session(POLICY + "\n" + other_policy, groups=["evidence"]) as session:
         policy = session.policy("portfolio.feed.data.v1")
-        recorder = EvidenceRecorder(session, PublicationStore(tmp_path), policy)
+        recorder = EvidenceRecorder(session, governed_store, policy)
         identity = recorder.append("Observation", call_id="test", application="test",
                                    purpose="verification", operation="read")
         assert recorder.read(identity).body["kind"] == "Observation"
@@ -184,7 +190,7 @@ def test_record_read_rechecks_authority_after_loading_the_native_object(tmp_path
             recorder.read(identity)
 
 
-def test_string_operations_preserve_claims_and_recheck_permission(tmp_path, monkeypatch):
+def test_string_operations_preserve_claims_and_recheck_permission(governed_store, monkeypatch):
     from uuid import uuid4
     from experiments.governed_strings import (
         Assessment, Context, EvidenceRecorder, OperationDenied, Request, TNString,
@@ -192,7 +198,7 @@ def test_string_operations_preserve_claims_and_recheck_permission(tmp_path, monk
 
     with tn.Session(POLICY, groups=["values", "evidence"]) as session:
         policy = session.policy("portfolio.feed.data.v1")
-        recorder = EvidenceRecorder(session, PublicationStore(tmp_path), policy)
+        recorder = EvidenceRecorder(session, governed_store, policy)
         context = Context(session, recorder, lambda r: Assessment(True, "internal use"),
                           application="test", purpose="analysis", actor="worker",
                           metadata_accept=lambda c: c.writer == session.did)

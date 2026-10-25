@@ -55,14 +55,17 @@ def graph_signature(root):
 
 
 def storage(root):
-    objects = list((root / "publications/objects").glob("*.tn"))
+    from deepvest_tn.publications import open_publication_store
+    with open_publication_store(root / "publications", read_only=True) as store:
+        objects = store.publication_sizes()
     graph = json.loads((root / "dag.json").read_text()) if (root / "dag.json").exists() else {"nodes": []}
-    values = {n["id"][7:] for n in graph["nodes"]}
+    values = {n["id"] for n in graph["nodes"]}
     record_files = list((root / "tapes").glob("*/*.tn"))
     return {
         "retained_native_objects": len(objects),
-        "retained_native_bytes": sum(p.stat().st_size for p in objects),
-        "value_publication_bytes": sum(p.stat().st_size for p in objects if p.stem in values),
+        "retained_native_bytes": sum(objects.values()),
+        "value_publication_bytes": sum(size for identity, size in objects.items() if identity in values),
+        "physical_store_bytes": sum(p.stat().st_size for p in (root / "publications").rglob("*") if p.is_file()),
         "exported_record_bytes": sum(p.stat().st_size for p in record_files),
         "note": "native bytes include metadata, records and creation snapshots; exported records duplicate store objects",
     }
@@ -79,7 +82,8 @@ def summarize(root):
     groups = defaultdict(list)
     pairs = defaultdict(dict)
     for case in cases:
-        identity = (case["rows"], case["depth"], case["branches"], case["with_model"])
+        identity = (case["rows"], case["depth"], case["branches"], case["with_model"],
+                    case.get("publication_storage", "files"))
         groups[(*identity, case["mode"])].append(case)
         repetition = case["directory"].split("-r")[-1].split("-")[0]
         pairs[(*identity, repetition)][case["mode"]] = case
@@ -107,7 +111,8 @@ def summarize(root):
             timing[name] = {"n": len(values), "median_s": statistics.median(values),
                            "min_s": min(values), "max_s": max(values)}
         aggregates.append({"rows": key[0], "depth": key[1], "branches": key[2],
-                           "model_requested": key[3], "mode": key[4], "attempts": len(runs),
+                           "model_requested": key[3], "publication_storage": key[4],
+                           "mode": key[5], "attempts": len(runs),
                            "completed": sum(bool(r["completed"]) for r in runs),
                            "verified": sum(bool(r["verified"]) for r in runs),
                            "timings_successful_verified_only": timing,
@@ -129,6 +134,7 @@ def summarize(root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, required=True)
+    parser.add_argument("--storage", choices=["files", "sqlite"], default="sqlite")
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--workloads", nargs="+", choices=[w[0] for w in WORKLOADS], default=[w[0] for w in WORKLOADS])
     parser.add_argument("--model-repetitions", type=int, default=0)
@@ -153,12 +159,14 @@ def main():
         for mode in (("primitive", "explicit") if repetition % 2 == 0 else ("explicit", "primitive")):
             schedule.append((f"model-r{repetition+1}-{mode}", mode, 4, 1, 1, True))
     (root / "schedule.json").write_text(json.dumps({"created": datetime.now(timezone.utc).isoformat(),
-                                                   "schedule": schedule, "hidden_retries": False}, indent=2))
+                                                   "schedule": schedule, "storage": args.storage,
+                                                   "hidden_retries": False}, indent=2))
     for number, (name, mode, rows, depth, branches, model) in enumerate(schedule, 1):
         print(f"[{number}/{len(schedule)}] {name}: rows={rows} depth={depth} branches={branches} model={model}", flush=True)
         with (root / (name + ".log")).open("w", encoding="utf-8") as log, redirect_stdout(log):
             with Profiler() as profile:
-                case = run_case(root / name, mode, rows=rows, depth=depth, branches=branches, model=model)
+                case = run_case(root / name, mode, rows=rows, depth=depth, branches=branches,
+                                model=model, storage=args.storage)
         (root / name / "profile.json").write_text(json.dumps(profile.export(), indent=2))
         print(json.dumps({"case": name, "completed": case["completed"], "verified": case["verified"],
                           "seconds": case["timings_seconds"]["total"], "error": case.get("error"),

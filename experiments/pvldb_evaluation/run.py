@@ -25,7 +25,7 @@ import tn_llama_client
 import tn_polars
 
 from deepvest_tn.native_run import governed_server, wsl_path
-from deepvest_tn.publications import PublicationStore, write_once
+from deepvest_tn.publications import open_publication_store, write_once
 from experiments.governed_strings.bloomberg_demo import (
     APPLICATION, MODEL_USE, NOTICE, PURPOSE, RECIPIENT_USE, REVIEW_ACTION, policy,
 )
@@ -119,7 +119,7 @@ class _Operations:
 
 def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
              unity_url="http://127.0.0.1:8080", binary=None, model_path=None,
-             port=18325, numeric_type="int", decimal_precision=38, decimal_scale=4):
+             port=18325, numeric_type="int", decimal_precision=38, decimal_scale=4, storage="sqlite"):
     """Return a case summary and preserve the verifier's run manifest.
 
     A model attempt uses one fresh server and one native request. Failures remain
@@ -143,6 +143,7 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
         "mode": mode, "rows": rows, "depth": depth, "branches": branches,
         "with_model": bool(model), "with_claim": bool(claim), "completed": False,
         "verified": False, "timings_seconds": timings, "error": None,
+        "publication_storage": storage,
     }
     if numeric_type not in {"int", "float", "Decimal"}:
         raise ValueError("unsupported source numeric type")
@@ -184,8 +185,9 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
                               read_only_roles=("model-reader", "observer"))
             output_paths = provision(root / "output-sessions", roles=["model-writer", "recipient"],
                                      groups=["tn.agents", "default"], read_only_roles=("recipient",))
-            store = PublicationStore(root / "publications")
+            store = open_publication_store(root / "publications", backend=storage)
         with ExitStack() as stack:
+            stack.enter_context(store)
             sessions = {role: stack.enter_context(tn.Session.from_config(str(path)))
                         for role, path in {**paths, **output_paths}.items() if role != "observer"}
             authority = sessions["catalog"].did
@@ -321,6 +323,7 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
                         "experiment_source_sha256": {p.relative_to(repository).as_posix(): digest(p)
                                                      for p in sorted(source_files)}},
                     "evaluation": {"mode": mode, "rows": rows, "depth": depth, "branches": branches,
+                                   "publication_storage": storage,
                                    "claim": bool(claim), "requested_model": bool(model),
                                    "error": summary["error"], "expected_content": summary["expected_content"],
                                    "comparison_scope": "Shared governed dataframe; automatic versus explicit downstream scalar propagation",
@@ -379,6 +382,8 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--numeric-type", choices=["int", "float", "Decimal"], default="int")
+    parser.add_argument("--storage", choices=["files", "sqlite"], default="sqlite",
+                        help="Publication storage (default: sqlite; files retains separate-file storage)")
     parser.add_argument("--decimal-precision", type=int, default=38)
     parser.add_argument("--decimal-scale", type=int, default=4)
     parser.add_argument("--mode", choices=("primitive", "explicit"), required=True)
@@ -396,7 +401,7 @@ def main():
     summary = run_case(args.run_directory, args.mode, rows=args.rows, depth=args.depth,
         branches=args.branches, model=args.with_model, claim=not args.without_claim,
         unity_url=args.unity_url, binary=args.binary, model_path=args.model_path, port=args.port, numeric_type=args.numeric_type,
-        decimal_precision=args.decimal_precision, decimal_scale=args.decimal_scale)
+        decimal_precision=args.decimal_precision, decimal_scale=args.decimal_scale, storage=args.storage)
     print(json.dumps(summary, indent=2))
     return 0 if summary["completed"] and summary["verified"] else 1
 

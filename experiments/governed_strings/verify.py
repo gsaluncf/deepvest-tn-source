@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 
 import tn
-from deepvest_tn.publications import PublicationStore
+from deepvest_tn.publications import open_publication_store
 
 from .evidence import EvidenceError, verify_tape
 from .primitives import SCHEMA, VALUE_TYPE
@@ -34,11 +34,11 @@ def verify(root):
     root = Path(root).resolve()
     run = json.loads((root / "run.json").read_text())
     require(run["schema"] == "tn.primitive-run.v1", "unknown run manifest")
-    store = PublicationStore(root / "publications")
+    store = open_publication_store(root / "publications", read_only=True)
     authority, writers = run["authority"], set(run["writers"])
     def object_(identity):
         return tn.GovernedObject.read(io.BytesIO(store.get(identity)))
-    with tn.Session.from_config(str(root / run["observer_config"])) as session:
+    with store, tn.Session.from_config(str(root / run["observer_config"])) as session:
         admin = tn.Governance.from_markdown(authority, POLICY, ".tn/config/agents.md", "experiment.administration")
         audit = tn.Governance.from_markdown(authority, POLICY, ".tn/config/agents.md", "experiment.evidence")
         require(admin.fields == run["administration_policy"] and audit.fields == run["audit_policy"],
