@@ -12,6 +12,7 @@ import sys
 from uuid import uuid4
 
 from install_unity import docker, install, wait_ready
+from dependency_paths import resolve_dependency
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,10 +27,12 @@ def case_command(python, args, directory, unity_url):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--tn-wheel", required=True, type=Path)
-    parser.add_argument("--binary", required=True, type=Path)
-    parser.add_argument("--model-path", required=True, type=Path)
-    parser.add_argument("--opa", required=True, type=Path)
+    parser.add_argument("--tn-wheel", type=Path, help="Override dependency discovery")
+    parser.add_argument("--binary", type=Path, help="Override dependency discovery")
+    parser.add_argument("--model-path", type=Path, help="Override dependency discovery")
+    parser.add_argument("--opa", type=Path, help="Override dependency discovery")
+    parser.add_argument("--dependency-dir", type=Path, default=ROOT / ".runtime/dependencies",
+                        help="Directory containing the wheel, OPA, TN model server and GGUF")
     parser.add_argument("--unity-url", help="Use this existing catalog instead of installing one")
     parser.add_argument("--unity-port", type=int, default=18080)
     parser.add_argument("--model-port", type=int, default=18325)
@@ -43,9 +46,10 @@ def main():
         if not required.is_file():
             parser.error(f"Required dependency record is missing: {required}")
     for name in ("tn_wheel", "binary", "model_path", "opa"):
-        path = getattr(args, name).resolve()
-        if not path.is_file():
-            parser.error(f"Missing {name}: {path}")
+        try:
+            path = resolve_dependency(name, getattr(args, name), directory=args.dependency_dir)
+        except ValueError as error:
+            parser.error(str(error))
         setattr(args, name, path)
     directory = (args.run_directory or ROOT / "experiments/results" / ("submission-" + uuid4().hex[:12])).resolve()
     if directory.exists():

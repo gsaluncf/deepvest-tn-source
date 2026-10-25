@@ -53,10 +53,10 @@ Use Windows and Python 3.12 for the pinned native runtime. Run commands from the
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python scripts/install.py --tn-wheel "C:\dependencies\tn_proto-2026.9.10b2.dev2-cp39-abi3-win_amd64.whl"
+python scripts/install.py
 ```
 
-Replace the example wheel path with the supplied native TN wheel. The installer checks its SHA-256 against [config/sdk-build.json](config/sdk-build.json), installs the bundled Polars adapter and model-client source, and installs this application. The wheel is an external binary dependency; it is not stored in this source repository.
+Place the supplied native TN wheel in `.runtime/dependencies/`, or set `TN_WHEEL` to its actual location. The installer checks its SHA-256 against [config/sdk-build.json](config/sdk-build.json), installs the bundled Polars adapter and model-client source, and installs this application. The wheel is an external binary dependency; it is not stored in this source repository.
 
 The SQL/dataframe runs also require:
 
@@ -64,10 +64,10 @@ The SQL/dataframe runs also require:
 - An OPA executable, on `PATH` or selected through `TN_POLARS_OPA`. The adapter compiles the evaluator to Wasm and executes it with Wasmtime.
 
 ```powershell
-$env:TN_POLARS_OPA = "C:\dependencies\opa.exe"
+$env:TN_POLARS_OPA = (Resolve-Path .runtime/dependencies/opa.exe).Path
 ```
 
-The model run additionally requires the TN-enabled `llama-server`, a compatible GGUF model, and WSL. This runner launches the Linux server through WSL using drive-backed Windows paths. Supply the binary and model paths explicitly. The runtime and model files are external dependencies; the Python transport client is included under `dependencies/tn-llama-client`.
+The model run additionally requires the TN-enabled `llama-server`, a compatible GGUF model, and WSL. This runner launches the Linux server through WSL using drive-backed Windows paths. The full-workflow launcher discovers these files as described below. The runtime and model files are external dependencies; the Python transport client is included under `dependencies/tn-llama-client`.
 
 ## Install Unity and run the complete example
 
@@ -77,18 +77,39 @@ actual LLM request**. It checks the returned report and pending-review registrat
 Docker Desktop must be running with Linux containers, and WSL must be available
 for the TN-enabled model server. The Unity image is pinned by digest.
 
+Place these files in `.runtime/dependencies/` under this checkout:
+
+- `tn_proto-2026.9.10b2.dev2-cp39-abi3-win_amd64.whl`
+- `opa.exe`
+- `llama-server` (the TN-enabled Linux executable)
+- One compatible `.gguf` model file
+
+The directory is excluded from Git. Then run:
+
 ```powershell
-py -3.12 scripts/run_submission.py `
-  --tn-wheel "C:\dependencies\tn_proto-2026.9.10b2.dev2-cp39-abi3-win_amd64.whl" `
-  --opa "C:\dependencies\opa.exe" `
-  --binary "C:\dependencies\llama-server" `
-  --model-path "C:\models\Qwen3-4B-Q4_K_M.gguf" `
-  --run-directory experiments/results/full-report
+py -3.12 scripts/run_submission.py --run-directory experiments/results/full-report
 ```
 
-Supply the four dependency files at their actual locations. The launcher installs
-Unity automatically; it does not download a model or substitute a generic model
-server for the TN-enabled binary. The default example uses one Decimal row.
+You can keep the files together elsewhere and pass `--dependency-dir` with that
+directory. Individual command-line options override environment variables, which
+override discovery in the dependency directory:
+
+| File | Environment variable | Command-line override |
+| --- | --- | --- |
+| Native TN wheel | `TN_WHEEL` | `--tn-wheel` |
+| OPA | `TN_POLARS_OPA` | `--opa` |
+| TN-enabled model server | `TN_LLAMA_BINARY` | `--binary` |
+| GGUF model | `TN_LLAMA_MODEL` | `--model-path` |
+
+OPA can also be found on `PATH`. The launcher does not select an arbitrary
+`llama-server` from `PATH`: it must be the TN-enabled server. If the dependency
+directory contains multiple GGUF models, select one explicitly. Relative paths
+supplied on the command line or through environment variables are resolved from
+your current directory; the default dependency directory is relative to the checkout.
+Invalid explicit paths produce an error rather than falling back to another file.
+
+The launcher installs Unity automatically; model and native runtime files are
+supplied separately. The default example uses one Decimal row.
 Use `--numeric-type int` or `--numeric-type float` to select another numeric type.
 
 To use your running Java Unity service, add `--unity-url http://127.0.0.1:8080`.
@@ -213,7 +234,7 @@ The context owns the signed operation records. A refusal therefore has a record 
 ## Run the complete model/report workflow
 
 ```powershell
-python -m experiments.pvldb_evaluation.run --mode primitive --rows 1 --numeric-type Decimal --with-model --binary "C:\dependencies\llama-server" --model-path "C:\models\Qwen3-4B-Q4_K_M.gguf" --run-directory experiments/results/sql-model-report
+py -3.12 scripts/run_submission.py --unity-url http://127.0.0.1:8080 --numeric-type Decimal --run-directory experiments/results/sql-model-report
 ```
 
 The example policy requires `log_compliance_creation`, a visible review notice, and registration of human review for the accepted report. Review can remain pending when the draft returns. The application records that state rather than claiming that someone has reviewed it.
