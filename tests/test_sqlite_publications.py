@@ -188,6 +188,34 @@ def test_backend_selection_and_durability_settings_are_explicit(tmp_path):
         open_publication_store(tmp_path, backend="unknown")
 
 
+def test_publication_blobs_use_rowid_table_with_nonnull_unique_identity(tmp_path):
+    with SQLitePublicationStore(tmp_path) as store:
+        tables = {row[1]: row for row in store._connection.execute("PRAGMA table_list")}
+        assert tables["publications"][4] == 0
+        assert tables["record_references"][4] == 1
+        with pytest.raises(sqlite3.IntegrityError):
+            store._connection.execute("INSERT INTO publications VALUES (NULL, ?, ?)", (b"wire", "digest"))
+
+
+def test_existing_without_rowid_database_stays_readable_and_writable(tmp_path):
+    with database_connection(tmp_path / "publications.sqlite3") as connection:
+        connection.execute("CREATE TABLE publications (object_id TEXT PRIMARY KEY, "
+                           "wire BLOB NOT NULL, wire_sha256 TEXT NOT NULL) WITHOUT ROWID")
+        connection.execute("CREATE TABLE record_references (context_id TEXT NOT NULL, "
+                           "sequence INTEGER NOT NULL CHECK(sequence > 0), "
+                           "object_id TEXT NOT NULL REFERENCES publications(object_id), "
+                           "PRIMARY KEY(context_id, sequence)) WITHOUT ROWID")
+        connection.execute("PRAGMA user_version=1")
+    snapshot, released = pair()
+    with SQLitePublicationStore(tmp_path) as store:
+        store.put_record(snapshot, released, context_id="old-database", sequence=1)
+        assert store.record_ids("old-database") == (released.id,)
+    with open_publication_store(tmp_path, read_only=True) as reopened:
+        assert reopened.get(released.id) == released.forward()
+        tables = {row[1]: row for row in reopened._connection.execute("PRAGMA table_list")}
+        assert tables["publications"][4] == 1
+
+
 @pytest.mark.parametrize("backend", ["files", "sqlite"])
 def test_independent_verifier_can_open_storage_read_only(tmp_path, backend):
     source = publication()

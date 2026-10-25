@@ -43,7 +43,7 @@ class SQLitePublicationStore(PublicationStore):
                 version = self._connection.execute("PRAGMA user_version").fetchone()[0]
                 if version == 0:
                     self._connection.execute("CREATE TABLE publications ("
-                        "object_id TEXT PRIMARY KEY, wire BLOB NOT NULL, wire_sha256 TEXT NOT NULL) WITHOUT ROWID")
+                        "object_id TEXT PRIMARY KEY NOT NULL, wire BLOB NOT NULL, wire_sha256 TEXT NOT NULL)")
                     self._connection.execute("CREATE TABLE record_references ("
                         "context_id TEXT NOT NULL, sequence INTEGER NOT NULL CHECK(sequence > 0), "
                         "object_id TEXT NOT NULL REFERENCES publications(object_id), "
