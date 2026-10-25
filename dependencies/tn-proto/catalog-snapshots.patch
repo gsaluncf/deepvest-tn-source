@@ -1,0 +1,112 @@
+--- a/crypto/tn-core/src/governed/dataset.rs
++++ b/crypto/tn-core/src/governed/dataset.rs
+@@ -1,6 +1,7 @@
+ //! Signed edition records and explicit, application-approved dataset selection.
+ 
+ use std::collections::{BTreeMap, BTreeSet};
++use std::sync::Arc;
+ 
+ use serde::{Deserialize, Deserializer, Serialize};
+ 
+@@ -536,7 +537,7 @@
+ /// Append-only catalog of authority-approved exact edition records.
+ #[derive(Debug, Clone, Default)]
+ pub struct DatasetCatalog {
+-    records: BTreeMap<String, AcceptedEdition>,
++    records: Arc<BTreeMap<String, Arc<AcceptedEdition>>>,
+ }
+ 
+ impl DatasetCatalog {
+@@ -575,9 +576,10 @@
+                 operation: "dataset.admit".to_owned(),
+             });
+         }
+-        self.records.insert(
++        // Existing records are immutable; a snapshot keeps its original membership.
++        Arc::make_mut(&mut self.records).insert(
+             edition.id().to_owned(),
+-            AcceptedEdition { edition, policies },
++            Arc::new(AcceptedEdition { edition, policies }),
+         );
+         Ok(())
+     }
+@@ -726,7 +728,7 @@
+ /// It has no public constructor or deserializer; only catalog selection creates it.
+ #[derive(Debug, Clone)]
+ pub struct DatasetSelection {
+-    accepted: AcceptedEdition,
++    accepted: Arc<AcceptedEdition>,
+     use_context: UseContext,
+ }
+ 
+--- a/crypto/tn-core/tests/governed_dataset_editions.rs
++++ b/crypto/tn-core/tests/governed_dataset_editions.rs
+@@ -887,3 +887,41 @@
+     assert_ne!(binding, altered);
+     assert!(catalog.verify_binding(&altered, &dag).is_err());
+ }
++
++#[test]
++fn catalog_snapshots_keep_independent_membership_and_exact_selections() {
++    let fixture = Fixture::new();
++    let (dag, revision, _) = history(&fixture);
++    let source = fixture.source(fixture.policy(&dag, &revision));
++    let first = fixture.edition("first", &source, &[revision.clone()]);
++    let second = fixture.edition("second", &source, &[revision.clone()]);
++    let third = fixture.edition("third", &source, &[revision]);
++    let mut catalog = DatasetCatalog::new();
++    catalog.admit(first.clone(), &dag, |_| Ok(true)).unwrap();
++    let selection = catalog.select("market.prices", "first", first.id(), &approved_use()).unwrap();
++    let mut snapshot = catalog.clone();
++
++    snapshot.admit(second.clone(), &dag, |_| Ok(true)).unwrap();
++    assert!(catalog.get(second.id()).is_none());
++    catalog.admit(third.clone(), &dag, |_| Ok(true)).unwrap();
++    assert!(snapshot.get(third.id()).is_none());
++    assert_eq!(catalog.len(), 2);
++    assert_eq!(snapshot.len(), 2);
++
++    let calls = AtomicUsize::new(0);
++    assert!(catalog.admit(second.clone(), &dag, |_| {
++        calls.fetch_add(1, Ordering::SeqCst);
++        Ok(false)
++    }).is_err());
++    assert_eq!(calls.load(Ordering::SeqCst), 1);
++    assert!(catalog.get(second.id()).is_none());
++    assert_eq!(snapshot.get(second.id()).unwrap().object().wire(), second.object().wire());
++    assert!(snapshot.verify_binding(&selection.binding(), &PolicyDag::new()).is_err());
++    catalog.verify_binding(&selection.binding(), &dag).unwrap();
++    snapshot.verify_binding(&selection.binding(), &dag).unwrap();
++    drop(catalog);
++    drop(snapshot);
++    assert_eq!(selection.record().object().wire(), first.object().wire());
++    assert_eq!(selection.source_object_id(), source.id());
++    fixture.assert_refused_before_business(&source, &selection, &later_use(), &["finance"]);
++}
+--- a/python/tests/test_governed_dataset_workflow.py
++++ b/python/tests/test_governed_dataset_workflow.py
+@@ -225,3 +225,24 @@
+     assert caught.value is error
+     assert source.wire == original_wire
+     assert receive(session, source, selection).data["last_price"] == 100
++
++
++def test_catalog_rejects_authority_decision_when_another_thread_changes_membership(workflow):
++    from concurrent.futures import ThreadPoolExecutor
++
++    _, dag, _, entries = workflow
++    old, new = entries[0][2], entries[1][2]
++    catalog = g.DatasetCatalog()
++
++    def authorize(_):
++        with ThreadPoolExecutor(max_workers=1) as executor:
++            executor.submit(catalog.admit, new, dag, lambda _: True).result(timeout=10)
++        return True
++
++    with pytest.raises(RuntimeError, match="changed during"):
++        catalog.admit(old, dag, authorize)
++    assert len(catalog) == 1
++    assert catalog.get(old.id) is None
++    assert catalog.get(new.id).object.wire == new.object.wire
++    catalog.admit(old, dag, lambda _: True)
++    assert len(catalog) == 2

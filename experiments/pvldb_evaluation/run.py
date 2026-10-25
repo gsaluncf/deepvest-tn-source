@@ -119,7 +119,8 @@ class _Operations:
 
 def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
              unity_url="http://127.0.0.1:8080", binary=None, model_path=None,
-             port=18325, numeric_type="int", decimal_precision=38, decimal_scale=4, storage="sqlite"):
+             port=18325, numeric_type="int", decimal_precision=38, decimal_scale=4, storage="sqlite",
+             sdk_build_record=None):
     """Return a case summary and preserve the verifier's run manifest.
 
     A model attempt uses one fresh server and one native request. Failures remain
@@ -161,11 +162,14 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
     total_started = time.perf_counter()
     stage = "preflight"
     try:
-        sdk = json.loads((repository / "config/sdk-build.json").read_text())
+        build_record = Path(sdk_build_record or repository / "config/sdk-build.json")
+        build_bytes = build_record.read_bytes()
+        sdk = json.loads(build_bytes)
         native_module = Path(tn.__file__).parent / "_native.pyd"
         if (importlib.metadata.version("tn-proto") != sdk["version"]
                 or digest(native_module) != sdk["install"]["native_module_sha256"]):
-            raise RuntimeError("installed TN runtime differs from the pinned build")
+            raise RuntimeError("installed TN runtime differs from the selected build record")
+        write_once(root / "sdk-build.json", build_bytes)
         if model and (not binary.is_file() or not model_path.is_file()):
             raise FileNotFoundError("configured native model binary or GGUF is missing")
         if mode == "explicit":
@@ -316,7 +320,8 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
                         "wheel_sha256": sdk["wheel_sha256"], "repository_commit": commit,
                         "dependency_versions": {name: importlib.metadata.version(name) for name in
                             ("polars", "tn-polars", "tn-llama-client", "wasmtime")},
-                        "sdk_build_record_sha256": digest(repository / "config/sdk-build.json"),
+                        "sdk_build_record": "sdk-build.json",
+                        "sdk_build_record_sha256": digest(root / "sdk-build.json"),
                         "uv_lock_sha256": digest(repository / "uv.lock"),
                         "pyproject_sha256": digest(repository / "pyproject.toml"),
                         "adapter_source_sha256": _adapter_sources(repository),
@@ -397,11 +402,14 @@ def main():
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--model-path", type=Path)
     parser.add_argument("--port", type=int, default=18325)
+    parser.add_argument("--sdk-build-record", type=Path,
+                        help="Expected native build record (default: repository's pinned build)")
     args = parser.parse_args()
     summary = run_case(args.run_directory, args.mode, rows=args.rows, depth=args.depth,
         branches=args.branches, model=args.with_model, claim=not args.without_claim,
         unity_url=args.unity_url, binary=args.binary, model_path=args.model_path, port=args.port, numeric_type=args.numeric_type,
-        decimal_precision=args.decimal_precision, decimal_scale=args.decimal_scale, storage=args.storage)
+        decimal_precision=args.decimal_precision, decimal_scale=args.decimal_scale, storage=args.storage,
+        sdk_build_record=args.sdk_build_record)
     print(json.dumps(summary, indent=2))
     return 0 if summary["completed"] and summary["verified"] else 1
 
