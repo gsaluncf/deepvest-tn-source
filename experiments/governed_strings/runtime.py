@@ -6,7 +6,6 @@ over the process or independent reader keys can access plaintext outside this AP
 
 from __future__ import annotations
 
-import io
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
@@ -152,7 +151,7 @@ class Context:
             _exposure.reset(token)
 
     def store_object(self, identity):
-        return tn.GovernedObject.read(io.BytesIO(self.recorder.store.get(identity)))
+        return self.recorder.store.read(identity)
 
     def _metadata(self, value):
         obj = self.store_object(value.reference.object_id)

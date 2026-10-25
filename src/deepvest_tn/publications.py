@@ -66,6 +66,10 @@ class PublicationStore:
         return verified.id
 
     def get(self, object_id: str) -> bytes:
+        return self.read(object_id).forward()
+
+    def read(self, object_id: str) -> tn.GovernedObject:
+        """Read current stored bytes and verify them once, without authorizing use."""
         digest = object_digest(object_id)
         index = json.loads((self.root / "index" / f"{digest}.json").read_bytes())
         relative = f"objects/{digest}.tn"
@@ -75,7 +79,7 @@ class PublicationStore:
         wire = path.read_bytes()
         if hashlib.sha256(wire).hexdigest() != index.get("wire_sha256"):
             raise ValueError("retained publication wire digest differs from its immutable index")
-        publication = tn.GovernedObject.read(path)
+        publication = tn.GovernedObject.read(io.BytesIO(wire))
         if publication.id != object_id or publication.forward() != wire:
             raise ValueError("retained publication has the wrong native identity")
-        return wire
+        return publication

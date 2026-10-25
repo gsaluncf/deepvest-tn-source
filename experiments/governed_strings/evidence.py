@@ -30,12 +30,12 @@ class Record:
 
 
 def read_record(wire, *, session, policy, expected_writer=None):
-    """Verify native TN before opening only the evidence group.
+    """Read TN bytes or a verified native object, then authorize evidence access.
 
     Accepting this read contract permits inspection, not endorsement of its claims.
     """
     try:
-        obj = tn.GovernedObject.read(io.BytesIO(wire))
+        obj = wire if isinstance(wire, tn.GovernedObject) else tn.GovernedObject.read(io.BytesIO(wire))
         if obj.object_type != EVIDENCE_TYPE:
             raise EvidenceError("wrong evidence object type")
         if expected_writer is not None and obj.writer != expected_writer:
@@ -152,7 +152,7 @@ class EvidenceRecorder:
             return tuple(self.store.get(identity) for identity in self._ids)
 
     def read(self, identity):
-        return read_record(self.store.get(identity), session=self.session, policy=self.policy)
+        return read_record(self.store.read(identity), session=self.session, policy=self.policy)
 
     def export(self, directory):
         """Export exact records plus a head to retain over a separately trusted channel.
