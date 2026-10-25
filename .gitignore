@@ -15,3 +15,5 @@ vendor/wheels/
 build/
 dist/
 *.egg-info/
+
+!README.md
