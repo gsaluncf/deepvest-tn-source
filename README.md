@@ -69,6 +69,47 @@ $env:TN_POLARS_OPA = "C:\dependencies\opa.exe"
 
 The model run additionally requires the TN-enabled `llama-server`, a compatible GGUF model, and WSL. This runner launches the Linux server through WSL using drive-backed Windows paths. Supply the binary and model paths explicitly. The runtime and model files are external dependencies; the Python transport client is included under `dependencies/tn-llama-client`.
 
+## Install Unity and run the complete example
+
+The single-command launcher creates a Python environment, installs the application,
+starts the Java Unity Catalog service in Docker, and runs the example **with an
+actual LLM request**. It checks the returned report and pending-review registration.
+Docker Desktop must be running with Linux containers, and WSL must be available
+for the TN-enabled model server. The Unity image is pinned by digest.
+
+```powershell
+py -3.12 scripts/run_submission.py `
+  --tn-wheel "C:\dependencies\tn_proto-2026.9.10b2.dev2-cp39-abi3-win_amd64.whl" `
+  --opa "C:\dependencies\opa.exe" `
+  --binary "C:\dependencies\llama-server" `
+  --model-path "C:\models\Qwen3-4B-Q4_K_M.gguf" `
+  --run-directory experiments/results/full-report
+```
+
+Supply the four dependency files at their actual locations. The launcher installs
+Unity automatically; it does not download a model or substitute a generic model
+server for the TN-enabled binary. The default example uses one Decimal row.
+Use `--numeric-type int` or `--numeric-type float` to select another numeric type.
+
+To use your running Java Unity service, add `--unity-url http://127.0.0.1:8080`.
+The launcher leaves that service running. A Unity container created by the launcher
+is stopped when the run finishes; its container and data volume are retained.
+The generated report is `report.html` and its review registration is `review.json`
+in the selected run directory. Any failed generation or verification returns an error.
+
+To install and start Unity separately:
+
+```powershell
+py -3.12 scripts/install_unity.py --port 18080
+```
+
+The installer pulls the official `unitycatalog/unitycatalog` image, which includes
+Java, and publishes its API only on `127.0.0.1`. It creates a local demonstration
+catalog with catalog-service authorization disabled; TN admission still verifies
+signed source assignments. It does not modify an existing Unity installation.
+The installer prints the container name and URL. Stop it with
+`docker stop tn-submission-unity`; restart it with `docker start tn-submission-unity`.
+
 ## Run the numeric verification first
 
 This command uses native encryption and signatures without a Unity or model connection:
