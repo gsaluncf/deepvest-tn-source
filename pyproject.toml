@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "deepvest-tn"
+version = "0.1.0"
+description = "Existing-workflow DeepVest–TN composition experiment"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "polars==1.39.3",
+  "tn-proto==2026.9.10b2.dev2",
+  "tn-llama-client==0.1.0",
+  "tn-polars==2026.9.11b1",
+  "wasmtime>=25",
+  "python-dotenv>=1.0",
+  "numpy>=2,<3",
+]
+
+[project.optional-dependencies]
+engine-service = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+]
+dev = [
+  "pytest>=8.4,<9",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+deepvest-tn = "deepvest_tn.cli:main"
+
+[tool.uv.sources]
+tn-polars = { path = "dependencies/tn-polars", editable = true }
+tn-llama-client = { path = "dependencies/tn-llama-client", editable = true }
+tn-proto = { path = "vendor/wheels/648ec96686e59efaa0b82af88cd8b1126568b15ce43718c8089cdaa7811de2f4/tn_proto-2026.9.10b2.dev2-cp39-abi3-win_amd64.whl" }
+
+[tool.uv]
+# All adapters use the same pinned native runtime.
+override-dependencies = ["tn-proto==2026.9.10b2.dev2"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deepvest_tn"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "dependencies/tn-polars"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["paper"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

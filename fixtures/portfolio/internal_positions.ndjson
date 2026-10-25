@@ -1,0 +1,3 @@
+{"account_id":"acct-001","portfolio_id":"portfolio-001","symbol":"AAPL","quantity":125,"cost_basis":182.40,"currency":"USD"}
+{"account_id":"acct-001","portfolio_id":"portfolio-001","symbol":"MSFT","quantity":80,"cost_basis":412.15,"currency":"USD"}
+{"account_id":"acct-001","portfolio_id":"portfolio-001","symbol":"VTI","quantity":210,"cost_basis":265.75,"currency":"USD"}

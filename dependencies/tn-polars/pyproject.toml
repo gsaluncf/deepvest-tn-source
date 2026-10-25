@@ -1,0 +1,12 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tn-polars"
+version = "2026.9.11b1"
+requires-python = ">=3.12"
+dependencies = ["polars==1.39.3", "python-dotenv>=1.0", "wasmtime>=25,<49", "tn-proto==2026.9.10b2.dev2"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["tn_polars"]

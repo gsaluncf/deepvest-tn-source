@@ -1,0 +1,8 @@
+{
+  "instruction": "Perform governed portfolio analysis and generate the approved internal portfolio report.",
+  "use_for": "Portfolio analysis and reporting for the authorized internal workflow.",
+  "do_not_use_for": "Trade execution or external redistribution of account-level data.",
+  "consequences": "Unauthorized use can expose confidential account information and violate portfolio-data governance.",
+  "on_violation_or_error": "log_and_continue",
+  "policy": ".tn/config/agents.md#portfolio.deepvest.calculated@1#sha256:8d4cff488bda7f5680ee4cac470001cb54e66bea1d7d548b51a71acb4a3f8de5"
+}

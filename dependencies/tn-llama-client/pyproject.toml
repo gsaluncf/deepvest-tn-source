@@ -1,0 +1,12 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tn-llama-client"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["tn-proto==2026.9.10b2.dev2"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["tn_llama_client"]

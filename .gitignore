@@ -1,0 +1,17 @@
+*.md
+*.MD
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.env
+.env.*
+.runtime/
+.artifacts/
+.verification/
+experiments/results/
+vendor/wheels/
+build/
+dist/
+*.egg-info/
