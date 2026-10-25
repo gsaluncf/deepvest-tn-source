@@ -39,6 +39,9 @@ def main():
     parser.add_argument("--python", type=Path, help="Use an existing Python 3.12 environment")
     parser.add_argument("--skip-install", action="store_true", help="Use dependencies already installed in --python")
     args = parser.parse_args()
+    for required in [ROOT / "uv.lock", ROOT / "config/sdk-build.json"]:
+        if not required.is_file():
+            parser.error(f"Required dependency record is missing: {required}")
     for name in ("tn_wheel", "binary", "model_path", "opa"):
         path = getattr(args, name).resolve()
         if not path.is_file():
