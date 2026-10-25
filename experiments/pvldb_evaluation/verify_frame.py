@@ -7,10 +7,10 @@ the expected result from the retained SQLite snapshot.
 """
 
 from collections import Counter
-from contextlib import closing
+from contextlib import ExitStack, closing
+from functools import lru_cache
 import hashlib
 from decimal import Decimal, localcontext
-import io
 import json
 from pathlib import Path
 import sqlite3
@@ -76,12 +76,20 @@ def verify_frame(root):
     authority, writers = run["authority"], set(run["writers"])
     use = tn.UseContext(run["request"]["application"], run["request"]["purpose"], "verify")
 
+    @lru_cache(maxsize=128)
     def object_(identity):
-        obj = tn.GovernedObject.read(io.BytesIO(store.get(identity)))
+        obj = store.read(identity)
         _require(obj.id == identity, "retained native publication identity differs")
         return obj
 
-    with store, tn.Session.from_config(str(root / run["observer_config"])) as session:
+    with store, tn.Session.from_config(str(root / run["observer_config"])) as session, ExitStack() as caches:
+        caches.callback(object_.cache_clear)
+
+        @lru_cache(maxsize=128)
+        def governance(identity):
+            return session.governance(object_(identity))
+
+        caches.callback(governance.cache_clear)
         admin = tn.Governance.from_markdown(authority, POLICY, ".tn/config/agents.md", "experiment.administration")
         audit = tn.Governance.from_markdown(authority, POLICY, ".tn/config/agents.md", "experiment.evidence")
         _require(admin.fields == run["administration_policy"] and audit.fields == run["audit_policy"],
@@ -91,7 +99,7 @@ def verify_frame(root):
             return ctx.writer == authority and len(ctx.policies) == 1 and ctx.governance.matches_contract(admin)
 
         def open_admin(obj, group):
-            admitted = session.governance(obj).accept(
+            admitted = governance(obj.id).accept(
                 use=tn.UseContext("offline-verifier", "inspect-evidence", "read"), groups=[group], decide=accept_admin)
             return session.open(admitted, [group])
 
@@ -141,7 +149,7 @@ def verify_frame(root):
                      "source edition authority differs")
             catalog.admit(edition, dag, lambda item: item.writer == authority)
             selected = catalog.select(edition.dataset, edition.edition, edition.id, use)
-            selected.verify_source(session.governance(object_(edition.source_object_id)), use, ["values", "evidence"])
+            selected.verify_source(governance(edition.source_object_id), use, ["values", "evidence"])
             required = {item.revision_id for item in edition.contracts}
             _require({item.policy_revision for item in edition.evaluator_artifacts} == required,
                      "edition lacks a complete signed evaluator set")
@@ -199,7 +207,7 @@ def verify_frame(root):
 
         def ancestor(identity):
             obj = object_(identity)
-            view = session.governance(obj)
+            view = governance(identity)
             _require(obj.writer in writers and obj.object_type == VALUE_TYPE
                      and all(policy.revision_id in policies
                              and policy.matches_contract(policies[policy.revision_id])
@@ -207,16 +215,23 @@ def verify_frame(root):
                      "native ancestor has an unrecognized writer or contract")
             return view
 
-        def open_value(reference):
-            obj = object_(reference["object_id"])
-            _require(reference["group"] == "values", "unexpected business group")
-            tn.LineageVerifier(max_objects=65536, max_depth=256).verify(session.governance(obj), catalog, dag, ancestor)
+        @lru_cache(maxsize=128)
+        def open_publication(identity):
+            obj = object_(identity)
+            tn.LineageVerifier(max_objects=65536, max_depth=256).verify(governance(identity), catalog, dag, ancestor)
             edition = source_editions.get(obj.id)
             selection = (catalog.select(edition.dataset, edition.edition, edition.id, use)
                          if edition is not None else None)
             data = session.receive(obj, use=use, groups=["values", "evidence"], selection=selection, decide=accepted_value)
             manifest = data.get("manifest", group="evidence")
             _require(manifest["schema"] == SCHEMA, "unknown primitive binding schema")
+            return obj, data, manifest
+
+        caches.callback(open_publication.cache_clear)
+
+        def open_value(reference):
+            _require(reference["group"] == "values", "unexpected business group")
+            obj, data, manifest = open_publication(reference["object_id"])
             binding = manifest["bindings"][reference["field"]]
             payload = data.get(reference["field"], group="values")
             _require(type(payload) is str, "primitive wire payload is not a string")

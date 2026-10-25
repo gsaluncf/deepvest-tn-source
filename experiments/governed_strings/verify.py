@@ -8,8 +8,9 @@ Cryptography establishes attribution and bindings, not the truth of a computatio
 
 import argparse
 from collections import Counter, defaultdict
+from contextlib import ExitStack
+from functools import lru_cache
 import hashlib
-import io
 import json
 from pathlib import Path
 
@@ -43,9 +44,17 @@ def verify(root):
     require(run["schema"] == "tn.primitive-run.v1", "unknown run manifest")
     store = open_publication_store(root / "publications", read_only=True)
     authority, writers = run["authority"], set(run["writers"])
-    def object_(identity):
-        return tn.GovernedObject.read(io.BytesIO(store.get(identity)))
-    with store, tn.Session.from_config(str(root / run["observer_config"])) as session:
+    with store, tn.Session.from_config(str(root / run["observer_config"])) as session, ExitStack() as caches:
+        def cached(function):
+            # All entries belong to this reader and this fixed verification run.
+            result = lru_cache(maxsize=128)(function)
+            caches.callback(result.cache_clear)
+            return result
+
+        @cached
+        def object_(identity):
+            return store.read(identity)
+
         admin = tn.Governance.from_markdown(authority, POLICY, ".tn/config/agents.md", "experiment.administration")
         audit = tn.Governance.from_markdown(authority, POLICY, ".tn/config/agents.md", "experiment.evidence")
         require(admin.fields == run["administration_policy"] and audit.fields == run["audit_policy"],
@@ -172,6 +181,7 @@ def verify(root):
         def accepted_value(ctx):
             return (ctx.writer in writers and ctx.object_type == VALUE_TYPE and bool(ctx.policies)
                     and all(p.revision_id in policies and p.matches_contract(policies[p.revision_id]) for p in ctx.policies))
+        @cached
         def view(identity):
             obj = object_(identity)
             require(obj.writer in writers and obj.object_type == VALUE_TYPE, "unrecognized ancestor publisher/type")
@@ -179,6 +189,19 @@ def verify(root):
             require(all(p.revision_id in policies and p.matches_contract(policies[p.revision_id])
                         for p in result.governance.policies), "ancestor substituted a contract")
             return result
+        @cached
+        def evidence(identity):
+            obj = object_(identity)
+            working = session.receive(obj, use=tn.UseContext("offline-verifier", "inspect-evidence", "read"),
+                                      groups=["evidence"], decide=accepted_value)
+            manifest = working.get("manifest", group="evidence")
+            require(manifest["schema"] == SCHEMA, "unknown primitive manifest")
+            return working, manifest
+
+        @cached
+        def lineage(identity):
+            return tn.LineageVerifier(max_objects=65536, max_depth=256).verify(view(identity), catalog, dag, view)
+
         def visit(key):
             if key in visited:
                 return
@@ -190,10 +213,7 @@ def verify(root):
             decision = by_id[rd["decision_id"]]
             obj = object_(key[0])
             require(record.writer == obj.writer, "Result is not from the incarnation's publisher")
-            working = session.receive(obj, use=tn.UseContext("offline-verifier", "inspect-evidence", "read"),
-                                      groups=["evidence"], decide=accepted_value)
-            manifest = working.get("manifest", group="evidence")
-            require(manifest["schema"] == SCHEMA, "unknown primitive manifest")
+            working, manifest = evidence(key[0])
             binding = manifest["bindings"][key[2]]
             require(binding["decision_id"] == decision.id and binding["parents"] == rb["inputs"]
                     and binding["claims"] == rd["claims"], "signed binding disagrees with Result")
@@ -273,8 +293,9 @@ def verify(root):
             key = ref_key(h["reference"])
             require(results[key].id == h["result_id"] and nodes[key]["decision_id"] == h["decision_id"],
                     "exported handle cites different operation evidence")
-            lineage = tn.LineageVerifier(max_objects=65536, max_depth=256).verify(view(key[0]), catalog, dag, view)
-            native_lineage[name] = {"object_ids": lineage.object_ids, "source_object_ids": lineage.source_object_ids}
+            checked_lineage = lineage(key[0])
+            native_lineage[name] = {"object_ids": checked_lineage.object_ids,
+                                    "source_object_ids": checked_lineage.source_object_ids}
         failures = [{"decision_id": r.body["details"]["decision_id"], "operation": r.body["operation"],
                      "error_type": r.body["details"]["error_type"], "writer": r.writer}
                     for r in records if r.body["kind"] == "Failure"]

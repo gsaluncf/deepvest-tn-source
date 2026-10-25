@@ -1,11 +1,14 @@
 """Independent verification distinguishes fields sharing one signed publication."""
 
 from contextlib import ExitStack
+from collections import Counter
+from functools import lru_cache
 import json
 import sqlite3
 
 import pytest
 import tn
+from tn.governed import GovernedError
 
 from deepvest_tn.publications import PublicationStore
 from experiments.governed_strings.catalog import AssignedRules, UnityGovernance, markdown
@@ -155,4 +158,69 @@ def test_source_row_must_match_signed_query_range_and_field(batch_run):
 def test_source_edition_must_name_the_assigned_table_and_column(batch_run):
     root, _ = batch_run
     with pytest.raises(EvidenceError, match="SQL column"):
+        verify(root)
+
+
+def test_shared_publication_is_read_and_opened_once_per_verification(batch_run, monkeypatch):
+    root, run = batch_run
+    source_id = run["outputs"]["0"]["reference"]["object_id"]
+    reads, receives = Counter(), Counter()
+    original_read, original_receive = PublicationStore.read, tn.Session.receive
+
+    def read(self, identity):
+        reads[identity] += 1
+        return original_read(self, identity)
+
+    def receive(self, obj, **kwargs):
+        receives[obj.id, tuple(kwargs.get("groups", []))] += 1
+        return original_receive(self, obj, **kwargs)
+
+    monkeypatch.setattr(PublicationStore, "read", read)
+    monkeypatch.setattr(tn.Session, "receive", receive)
+    for repetition in (1, 2):
+        assert verify(root)["incarnations"] == 2
+        assert reads[source_id] == repetition
+        assert receives[source_id, ("evidence",)] == repetition
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_verification_cache_is_bounded_and_cleared_on_exit(batch_run, monkeypatch, fail):
+    from experiments.governed_strings import verify as module
+    root, run = batch_run
+    caches = []
+
+    def tracked_cache(*args, **kwargs):
+        def decorate(function):
+            cached = lru_cache(*args, **kwargs)(function)
+            caches.append(cached)
+            return cached
+        return decorate
+
+    monkeypatch.setattr(module, "lru_cache", tracked_cache)
+    if fail:
+        run["outputs"]["0"]["result_id"] = run["outputs"]["1"]["result_id"]
+        (root / "run.json").write_text(json.dumps(run), encoding="utf-8")
+        with pytest.raises(EvidenceError, match="exported handle"):
+            verify(root)
+    else:
+        verify(root)
+    assert caches
+    assert all(cache.cache_info().maxsize == 128 and cache.cache_info().currsize == 0
+               for cache in caches)
+
+
+@pytest.mark.parametrize("change", ["authority", "use", "wire"])
+def test_later_verification_rechecks_changed_inputs(batch_run, change):
+    root, run = batch_run
+    verify(root)
+    if change == "authority":
+        run["authority"] = run["writers"][0]
+    elif change == "use":
+        run["request"]["purpose"] = "unassigned-purpose"
+    else:
+        identity = run["outputs"]["0"]["reference"]["object_id"]
+        path = root / "publications" / "objects" / (identity[7:] + ".tn")
+        path.write_bytes(path.read_bytes() + b" ")
+    (root / "run.json").write_text(json.dumps(run), encoding="utf-8")
+    with pytest.raises((ValueError, GovernedError)):
         verify(root)
