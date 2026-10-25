@@ -44,7 +44,7 @@ class RegistryEntry:
     compiled_policy_bytes: bytes | None = None
     profile_bytes: bytes | None = None
 
-    def evaluator(self):
+    def evaluator(self, *, module_cache=None):
         from .opa import OpaWasmEvaluator
         if self.verified_artifacts is not None:
             if self.revision_id != self.verified_artifacts.policy_revision:
@@ -57,7 +57,8 @@ class RegistryEntry:
                     or self.dtypes != profile_value.get("dtypes")
                     or self.label_map != profile_value.get("labels")):
                 raise PolicyDenied("prepared evaluator metadata changed after artifact verification")
-            return OpaWasmEvaluator.from_bytes(wasm, data)
+            return OpaWasmEvaluator.from_bytes(wasm, data, module_cache=module_cache,
+                                               policy_revision=self.revision_id)
         return OpaWasmEvaluator(self.wasm_path, self.data_path)
 
 

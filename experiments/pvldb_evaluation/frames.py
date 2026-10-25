@@ -20,6 +20,7 @@ import polars as pl
 import tn
 from tn_polars.build import build_opa_wasm
 from tn_polars.frame import GovernedLazyFrame
+from tn_polars.opa import OpaModuleCache
 from tn_polars.policy import CompiledPolicy
 from tn_polars.registry import write_edition_bundle
 from tn_polars.support import Support
@@ -166,6 +167,9 @@ def _artifact_facts(artifacts):
 def _select_policies(context, metadata, values, use):
     """Resolve each cell's original edition, including attested descendants."""
     policy_set = None
+    # Reuse only compiled code within this call. Each cell still has its own
+    # current edition checks and evaluator state, under this context and use.
+    module_cache = OpaModuleCache()
     sources = {"name": set(), "value": set()}
     editions, inputs = {}, []
     for index, ((data, primitive_binding, _), value) in enumerate(zip(metadata, values)):
@@ -185,7 +189,7 @@ def _select_policies(context, metadata, values, use):
         if len(primitive_binding["origins"]) != 1 or primitive_binding["origins"][0]["column"] != column:
             raise EvidenceError("cell position differs from its retained SQL origin")
         selection = context.catalog.select(record.dataset, record.edition, record.id, use)
-        current = PolicySet.for_selection(resolved.entries, selection)
+        current = PolicySet.for_selection(resolved.entries, selection, module_cache=module_cache)
         policy_set = current if policy_set is None else policy_set.include(current)
         root = root_name(binding.source_object_id, column)
         sources[column].add(root)

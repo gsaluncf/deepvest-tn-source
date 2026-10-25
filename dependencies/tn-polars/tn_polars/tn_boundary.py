@@ -48,7 +48,7 @@ class PolicySet:
         self._entries = MappingProxyType(dict(entries))
 
     @classmethod
-    def for_selection(cls, entries, selection):
+    def for_selection(cls, entries, selection, *, module_cache=None):
         from tn.governed import DatasetSelection, EvaluatorArtifactSet
         if not isinstance(selection, DatasetSelection):
             raise TypeError("TN frame loading requires an accepted native DatasetSelection")
@@ -72,7 +72,8 @@ class PolicySet:
                 raise _refusal("Compiled policy or profile bytes differ from the approved edition")
             policy = CompiledPolicy.from_dict(json.loads(compiled_bytes))
             profile = json.loads(profile_bytes)
-            evaluator = entry.evaluator()
+            evaluator = (entry.evaluator() if module_cache is None
+                         else entry.evaluator(module_cache=module_cache))
             accepted[revision] = _PolicyEntry(policy, evaluator, artifacts,
                 frozenset({selection.source_object_id}), deepcopy(profile.get("dtypes")))
         return cls(accepted)
