@@ -21,6 +21,7 @@ from types import MappingProxyType
 
 from .policy import CompiledPolicy
 from .release import PolicyDenied
+from .bundles import PackedArtifactPath, open_bundle, pack_files, read_artifact_files
 
 API = "/api/2.1/unity-catalog"
 
@@ -37,8 +38,8 @@ class RegistryEntry:
     tn_governance: dict
     dtypes: dict | None
     label_map: dict | None
-    wasm_path: Path
-    data_path: Path
+    wasm_path: Path | PackedArtifactPath
+    data_path: Path | PackedArtifactPath
     revision_id: str | None = None
     verified_artifacts: object | None = None
     compiled_policy_bytes: bytes | None = None
@@ -50,7 +51,7 @@ class RegistryEntry:
             if self.revision_id != self.verified_artifacts.policy_revision:
                 raise PolicyDenied("evaluator revision differs from its accepted artifact binding")
             compiled, profile = self.compiled_policy_bytes, self.profile_bytes
-            wasm, data = self.wasm_path.read_bytes(), self.data_path.read_bytes()
+            wasm, data = read_artifact_files(self.wasm_path, self.data_path)
             _verify_artifact_bytes(self.verified_artifacts, compiled, profile, wasm, data)
             profile_value = json.loads(profile)
             if (self.policy.to_dict() != json.loads(compiled)
@@ -268,10 +269,10 @@ def _local_path(storage_location, full_name):
 
 @dataclass(frozen=True)
 class EvaluatorArtifactPaths:
-    compiled_policy_path: Path
-    profile_path: Path
-    wasm_path: Path
-    data_path: Path
+    compiled_policy_path: Path | PackedArtifactPath
+    profile_path: Path | PackedArtifactPath
+    wasm_path: Path | PackedArtifactPath
+    data_path: Path | PackedArtifactPath
 
 
 @dataclass(frozen=True)
@@ -313,7 +314,7 @@ def _immutable_write(path, content):
 
 
 def write_edition_bundle(root, *, dataset, edition, record_id, edition_wire,
-                         revision_wires, evaluators):
+                         revision_wires, evaluators, packed=False):
     """Retain signed metadata and artifacts; this transport manifest grants no authority."""
     _digest(record_id)
     root = Path(root)
@@ -321,48 +322,55 @@ def write_edition_bundle(root, *, dataset, edition, record_id, edition_wire,
     revision_ids = [identity for identity, _wire in revisions]
     if len(set(revision_ids)) != len(revision_ids):
         raise PolicyDenied("edition bundle must list each revision once")
-    _immutable_write(root / "edition.tn", edition_wire)
+    other_format = "bundle.json" if packed else "bundle.zip"
+    if (root / other_format).exists():
+        raise PolicyDenied("edition directory already uses another bundle format")
+    files = {"edition.tn": edition_wire}
     for identity, wire in revisions:
-        _immutable_write(root / "revisions" / f"{_digest(identity)}.tn", wire)
+        files[f"revisions/{_digest(identity)}.tn"] = wire
     for identity, artifacts in evaluators.items():
         if set(artifacts) != set(_ARTIFACT_FILES):
             raise PolicyDenied("each evaluator needs compiled policy, profile, wasm and data")
-        directory = root / "evaluators" / _digest(identity)
         for filename in _ARTIFACT_FILES:
-            _immutable_write(directory / filename, artifacts[filename])
+            files[f"evaluators/{_digest(identity)}/{filename}"] = artifacts[filename]
     manifest = {"schema": "tn.dataset.bundle.v1", "dataset": dataset, "edition": edition,
                 "record_id": record_id, "revisions": revision_ids,
                 "evaluators": list(evaluators)}
-    _immutable_write(root / "bundle.json", json.dumps(manifest, sort_keys=True).encode("utf-8"))
+    files["bundle.json"] = json.dumps(manifest, sort_keys=True).encode("utf-8")
+    if packed:
+        _immutable_write(root / "bundle.zip", pack_files(files))
+    else:
+        for name, raw in files.items():
+            _immutable_write(root / name, raw)
     return root
 
 
 def _load_edition(dataset, edition, record_id, root):
     _digest(record_id)
     try:
-        manifest = json.loads((root / "bundle.json").read_bytes())
-        if (manifest.get("schema"), manifest.get("dataset"), manifest.get("edition"),
-                manifest.get("record_id")) != (
-                "tn.dataset.bundle.v1", dataset, edition, record_id):
-            raise PolicyDenied("immutable edition bundle identity does not match the request")
-        revisions = manifest["revisions"]
-        evaluators = manifest["evaluators"]
-        if (not isinstance(revisions, list) or not isinstance(evaluators, list)
-                or len(revisions) != len(set(revisions))
-                or len(evaluators) != len(set(evaluators))):
-            raise PolicyDenied("edition transport lists must contain unique identities")
-        paths = {}
-        for identity in evaluators:
-            directory = root / "evaluators" / _digest(identity)
-            files = [directory / name for name in _ARTIFACT_FILES]
-            if not all(path.is_file() for path in files):
-                raise PolicyDenied("edition evaluator artifacts are incomplete")
-            paths[identity] = EvaluatorArtifactPaths(*files)
-        return EditionRegistryEntry(
-            dataset, edition, record_id, (root / "edition.tn").read_bytes(),
-            tuple((identity, (root / "revisions" / f"{_digest(identity)}.tn").read_bytes())
-                  for identity in revisions), MappingProxyType(paths),
-        )
+        with open_bundle(root) as bundle:
+            manifest = json.loads(bundle.read("bundle.json"))
+            if (manifest.get("schema"), manifest.get("dataset"), manifest.get("edition"),
+                    manifest.get("record_id")) != (
+                    "tn.dataset.bundle.v1", dataset, edition, record_id):
+                raise PolicyDenied("immutable edition bundle identity does not match the request")
+            revisions = manifest["revisions"]
+            evaluators = manifest["evaluators"]
+            if (not isinstance(revisions, list) or not isinstance(evaluators, list)
+                    or len(revisions) != len(set(revisions))
+                    or len(evaluators) != len(set(evaluators))):
+                raise PolicyDenied("edition transport lists must contain unique identities")
+            paths = {}
+            for identity in evaluators:
+                files = [f"evaluators/{_digest(identity)}/{name}" for name in _ARTIFACT_FILES]
+                if not all(bundle.is_file(name) for name in files):
+                    raise PolicyDenied("edition evaluator artifacts are incomplete")
+                paths[identity] = EvaluatorArtifactPaths(*(bundle.member(name) for name in files))
+            return EditionRegistryEntry(
+                dataset, edition, record_id, bundle.read("edition.tn"),
+                tuple((identity, bundle.read(f"revisions/{_digest(identity)}.tn"))
+                      for identity in revisions), MappingProxyType(paths),
+            )
     except FileNotFoundError as error:
         raise PolicyDenied(f"edition bundle is incomplete: missing {error.filename}") from error
 
@@ -383,8 +391,8 @@ def verified_edition_entry(name, governance, revision_id, expected, paths):
     from tn.governed import EvaluatorArtifactSet
     if not isinstance(expected, EvaluatorArtifactSet) or expected.policy_revision != revision_id:
         raise PolicyDenied("evaluator needs its native per-revision artifact binding")
-    compiled, profile = paths.compiled_policy_path.read_bytes(), paths.profile_path.read_bytes()
-    wasm, data = paths.wasm_path.read_bytes(), paths.data_path.read_bytes()
+    compiled, profile, wasm, data = read_artifact_files(
+        paths.compiled_policy_path, paths.profile_path, paths.wasm_path, paths.data_path)
     _verify_artifact_bytes(expected, compiled, profile, wasm, data)
     profile_value = json.loads(profile)
     return RegistryEntry(

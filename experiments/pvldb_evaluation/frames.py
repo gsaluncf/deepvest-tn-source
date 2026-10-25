@@ -113,7 +113,7 @@ class DataframeGovernance(UnityGovernance):
         bundle = write_edition_bundle(directory, dataset=dataset, edition=edition, record_id=record.id,
             edition_wire=record_obj.forward(),
             revision_wires=[(r, self.store.get(r)) for r in assignment["revisions"]],
-            evaluators={policy.revision_id: files})
+            evaluators={policy.revision_id: files}, packed=True)
         # Source assignment publication and resolution have established this catalog and schema.
         self.registry.register_edition(dataset, edition, record.id, bundle, create_namespace=False)
         return {"dataset": dataset, "edition": edition, "record_id": record.id,

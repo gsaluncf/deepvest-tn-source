@@ -14,6 +14,7 @@ import io
 import json
 from pathlib import Path
 import sqlite3
+import zipfile
 
 import tn
 from tn_polars.opa import OpaWasmEvaluator
@@ -50,6 +51,20 @@ def _digest(raw):
 
 def _artifact_facts(artifact):
     return {name: getattr(artifact, name) for name in ("policy_revision", *_FILES.values())}
+
+
+def _bundle_members(marker, names):
+    """Read transport files independently of the application's bundle adapter."""
+    if marker.name == "bundle.zip":
+        _require(not (marker.parent / "bundle.json").exists(), "conflicting edition bundle formats")
+        with zipfile.ZipFile(marker) as archive:
+            infos = archive.infolist()
+            _require(len(infos) == len({item.filename for item in infos}), "duplicate archive members")
+            _require(all(item.compress_type == zipfile.ZIP_STORED for item in infos),
+                     "edition archive contains compressed members")
+            return {name: archive.read(name) for name in names}
+    _require(not (marker.parent / "bundle.zip").exists(), "conflicting edition bundle formats")
+    return {name: (marker.parent / name).read_bytes() for name in names}
 
 
 def verify_frame(root):
@@ -268,24 +283,32 @@ def verify_frame(root):
 
         # Locate immutable bundles by their indexed native edition identities.
         bundles = {}
-        for path in (root / "editions").glob("*/*/bundle.json"):
-            locator = json.loads(path.read_text())
+        markers = [*(root / "editions").glob("*/*/bundle.json"),
+                   *(root / "editions").glob("*/*/bundle.zip")]
+        for path in markers:
+            locator = json.loads(_bundle_members(path, ["bundle.json"])["bundle.json"])
             _require(locator["record_id"] not in bundles, "duplicate edition bundle locator")
-            bundles[locator["record_id"]] = path.parent
+            bundles[locator["record_id"]] = path
         evaluators, artifact_hashes = {}, {}
         _require({item["policy_revision"]: item for item in facts["policy_artifacts"]} == artifacts,
                  "signed dataframe artifact observations differ from source editions")
         for edition in editions.values():
-            directory = bundles[edition.id]
-            _require((directory / "edition.tn").read_bytes() == store.get(edition.id), "bundle edition differs from retained native wire")
+            marker = bundles[edition.id]
+            names = [f"evaluators/{artifact.policy_revision[7:]}/{name}"
+                     for artifact in edition.evaluator_artifacts for name in _FILES]
+            members = _bundle_members(marker, ["edition.tn", *names])
+            _require(members["edition.tn"] == store.get(edition.id), "bundle edition differs from retained native wire")
             for artifact in edition.evaluator_artifacts:
                 revision = artifact.policy_revision
-                directory_ = directory / "evaluators" / revision[7:]
-                payload = {name: (directory_ / name).read_bytes() for name in _FILES}
+                member_prefix = f"evaluators/{revision[7:]}/"
+                payload = {name: members[member_prefix + name] for name in _FILES}
                 for name, attribute in _FILES.items():
                     actual = _digest(payload[name])
                     _require(actual == getattr(artifact, attribute), "evaluator artifact differs from its signed edition")
-                    artifact_hashes[(directory_ / name).relative_to(root).as_posix()] = actual
+                    location = (marker.relative_to(root).as_posix() + "!/" + member_prefix + name
+                                if marker.name == "bundle.zip" else
+                                (marker.parent / member_prefix / name).relative_to(root).as_posix())
+                    artifact_hashes[location] = actual
                 compiled, profile = json.loads(payload["compiled_policy.json"]), json.loads(payload["profile.json"])
                 _require(compiled["policy_ref"] == policies[revision].policy_ref
                          and compiled["fields"] == {"name": "internal", "value": "internal"}
