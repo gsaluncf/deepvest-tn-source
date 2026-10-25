@@ -30,6 +30,43 @@ def test_full_runner_always_calls_model(tmp_path):
     assert command[command.index("--unity-url") + 1] == "http://127.0.0.1:18080"
 
 
+def test_server_discovery_keeps_shared_library_directory(tmp_path):
+    resolver = load("dependency_paths")
+    directory = tmp_path / "tn-llama"
+    directory.mkdir()
+    server = directory / "llama-server"
+    server.write_bytes(b"server")
+    assert resolver.resolve_dependency("binary", directory=tmp_path, environ={}) == server.resolve()
+
+
+def test_server_package_copies_shared_library_targets(tmp_path):
+    packager = load("package_llama")
+    source, destination = tmp_path / "build", tmp_path / "installed"
+    source.mkdir()
+    (source / "llama-server").write_bytes(b"server")
+    (source / "libllama-server-impl.so").write_bytes(b"governed implementation")
+    packager.package(source, destination, "cpu")
+    import json
+    import hashlib
+    record = json.loads((destination / "build.json").read_text())
+    assert {item["file"] for item in record["files"]} == {"llama-server", "libllama-server-impl.so"}
+    for item in record["files"]:
+        assert hashlib.sha256((destination / item["file"]).read_bytes()).hexdigest() == item["sha256"]
+
+
+def test_missing_dependency_stops_before_server_build(tmp_path):
+    unity = load("install_unity")
+    with patch.dict(sys.modules, {"install_unity": unity, "dependency_paths": load("dependency_paths")}):
+        runner = load("run_submission")
+    with patch.object(sys, "argv", ["run_submission.py", "--build-server", "cpu",
+                                   "--tn-wheel", str(tmp_path / "missing.whl")]):
+        with patch.object(runner.subprocess, "run") as execute:
+            with pytest.raises(SystemExit) as error:
+                runner.main()
+            assert error.value.code == 2
+            execute.assert_not_called()
+
+
 def test_installer_does_not_replace_existing_container():
     unity = load("install_unity")
     with patch.object(unity, "docker", side_effect=["27", "owned-elsewhere"]) as docker:

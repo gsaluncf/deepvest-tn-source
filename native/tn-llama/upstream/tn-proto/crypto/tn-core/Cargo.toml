@@ -1,0 +1,59 @@
+[package]
+name = "tn-core"
+version = "0.0.1"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "TN governed data protocol: encrypted contracts, signed envelopes, selected opening, derivation, and event chains."
+
+[dependencies]
+tn-btn = { path = "../tn-btn" }
+tn-hibe = { path = "../tn-hibe", optional = true }
+sha2 = { workspace = true }
+hmac = { workspace = true }
+hkdf = { workspace = true }
+ed25519-dalek = { workspace = true }
+curve25519-dalek = "4"
+subtle = { workspace = true }
+zeroize = { workspace = true }
+rand_core = { workspace = true }
+thiserror = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yml = "0.0.12"
+aes = { version = "0.8", features = ["zeroize"] }
+aes-gcm = { version = "0.10", features = ["aes", "zeroize"] }
+aes-kw = { version = "0.2.1", features = ["std"] }
+uuid = { version = "1", features = ["v4", "v7"] }
+time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
+bs58 = "0.5"
+clap = { version = "4", features = ["derive"], optional = true }
+log = "0.4"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tempfile = { version = "3", optional = true }
+fs4 = { version = "0.13", optional = true }
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { version = "1", features = ["v4", "v7", "js"] }
+time = { version = "0.3", features = ["formatting", "parsing", "macros", "wasm-bindgen"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = "3"
+
+[features]
+default = ["fs", "fs-locking", "hibe", "native-jwe"]
+hibe = ["dep:tn-hibe"]
+native-jwe = []
+fs = ["dep:clap", "dep:tempfile"]
+fs-locking = ["fs", "dep:fs4"]
+
+[[bench]]
+name = "pipeline"
+harness = false
+
+[[bin]]
+name = "tn-core-cli"
+path = "bin/tn-core-cli.rs"
+required-features = ["fs"]

@@ -1,0 +1,22 @@
+[package]
+name = "tn-test-tools"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+tn-core = { path = "../../upstream/tn-proto/crypto/tn-core", default-features = false, features = ["fs", "fs-locking"] }
+tn-btn = { path = "../../upstream/tn-proto/crypto/tn-btn" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+base64 = "0.22"
+sha2 = "0.10"
+hex = "0.4"
+tempfile = "3"
+thiserror = "1"
+clap = { version = "4", features = ["derive"] }
+time = { version = "0.3", features = ["parsing"] }
+
+[dev-dependencies]
+tn-runtime = { path = "../tn-runtime" }

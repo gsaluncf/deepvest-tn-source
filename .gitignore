@@ -13,6 +13,8 @@ __pycache__/
 experiments/results/
 vendor/wheels/
 build/
+target/
+*.gguf
 dist/
 *.egg-info/
 

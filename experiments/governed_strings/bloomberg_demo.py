@@ -57,7 +57,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--unity-url", default="http://127.0.0.1:8080")
     parser.add_argument("--run-directory", type=Path)
-    parser.add_argument("--binary", type=Path, default=repository.parent / "tn-llama/build/llama.cpp/cuda-wsl-tn/bin/llama-server")
+    parser.add_argument("--binary", type=Path, default=repository / ".runtime/dependencies/tn-llama/llama-server")
     parser.add_argument("--model", type=Path, default=repository / ".artifacts/models/Qwen3-4B-Q4_K_M.gguf")
     parser.add_argument("--port", type=int, default=18325)
     parser.add_argument("--native-windows", action="store_true", help="use a compatible Windows native binary instead of WSL")

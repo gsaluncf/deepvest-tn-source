@@ -1,7 +1,7 @@
 """Install with Python 3.12: python scripts/install.py --tn-wheel PATH.
 
 The native TN wheel is supplied separately and checked against its pinned digest.
-Unity, OPA and the governed model server are external services or executables.
+Unity and OPA are runtime dependencies. scripts/build_llama.sh builds the included server.
 """
 import argparse
 import hashlib

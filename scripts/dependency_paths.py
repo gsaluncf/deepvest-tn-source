@@ -25,6 +25,10 @@ def resolve_dependency(name, explicit=None, *, directory, environ=None):
         raise ValueError(f"Multiple files match {pattern}; select one with {option} or {variable}")
     if candidates:
         return candidates[0]
+    if name == "binary":
+        built = Path(directory) / "tn-llama" / "llama-server"
+        if built.is_file():
+            return built.resolve()
     if name == "opa":
         found = shutil.which("opa", path=environment.get("PATH", ""))
         if found:

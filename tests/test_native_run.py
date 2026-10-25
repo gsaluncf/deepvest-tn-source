@@ -2,7 +2,14 @@ import socket
 
 import pytest
 
-from deepvest_tn.native_run import governed_server
+from deepvest_tn.native_run import governed_server, wsl_command
+
+
+def test_wsl_distribution_is_configurable(monkeypatch):
+    monkeypatch.delenv("TN_WSL_DISTRO", raising=False)
+    assert wsl_command() == ["wsl", "--"]
+    monkeypatch.setenv("TN_WSL_DISTRO", "Research Linux")
+    assert wsl_command() == ["wsl", "-d", "Research Linux", "--"]
 
 
 def test_runner_refuses_an_occupied_port_before_launch(tmp_path, monkeypatch):

@@ -40,6 +40,7 @@ A new statement about a result does not turn an original source's statement abou
 | [sql.py](experiments/governed_strings/sql.py) | Resolving source governance and returning governed SQL cells |
 | [frames.py](experiments/pvldb_evaluation/frames.py) | SQL cells through governed Polars and back to a governed number |
 | [numeric_profile.py](experiments/pvldb_evaluation/numeric_profile.py) | Exact dataframe types and range checks |
+| [Native server](native/tn-llama) | Rust governance runtime, TN cryptography, C++ integration and pinned llama.cpp patch |
 | [model.py](experiments/governed_strings/model.py) | Native model handoff and registration of pending review |
 | [run.py](experiments/pvldb_evaluation/run.py) | Complete setup, execution and verification of the submission example |
 | [evidence.py](experiments/governed_strings/evidence.py) | Signed, context-owned operation records |
@@ -69,7 +70,34 @@ The SQL/dataframe runs also require:
 $env:TN_POLARS_OPA = (Resolve-Path .runtime/dependencies/opa.exe).Path
 ```
 
-The model run additionally requires the TN-enabled `llama-server`, a compatible GGUF model, and WSL. This runner launches the Linux server through WSL using drive-backed Windows paths. The full-workflow launcher discovers these files as described below. The runtime and model files are external dependencies; the Python transport client is included under `dependencies/tn-llama-client`.
+The TN-enabled server source is included under `native/tn-llama`: the Rust governance runtime, TN cryptography, C++ integration, and the llama.cpp patch. The build script fetches llama.cpp at the pinned commit and links these components into `llama-server`. The Python transport client is under `dependencies/tn-llama-client`. Supply your own compatible GGUF model weights.
+
+The runner launches the Linux server through WSL using drive-backed Windows paths. Build and run use your default WSL distribution. Set `TN_WSL_DISTRO` if you want a different installed distribution.
+
+Rust verifies incoming TN publications, controls when the model can read their contents, runs required tools, and releases encrypted reports with their source governance. The C++ integration connects those checks to llama.cpp's inference loop.
+
+- [Native inference integration](native/tn-llama/src/llama/server-tn.cpp)
+- [Session and model transitions](native/tn-llama/crates/tn-runtime/src/session.rs)
+- [Governed input verification](native/tn-llama/crates/tn-runtime/src/governed_input.rs)
+- [Signed report publication](native/tn-llama/crates/tn-runtime/src/output_tn.rs)
+
+### Build the included model server
+
+In your chosen WSL distribution, install Git, CMake 3.24 or newer, Ninja, a C++ compiler, Python 3, and Rust 1.95 or newer. A CUDA build also requires the NVIDIA CUDA Toolkit with `nvcc` on PATH. CPU builds do not require CUDA.
+
+From the repository root in PowerShell, build and run the complete example:
+
+```powershell
+py -3.12 scripts/run_submission.py --build-server cpu --run-directory experiments/results/full-report
+```
+
+Use `--build-server cuda` for GPU inference. CUDA builds target the installed GPU; set `TN_CUDA_ARCHITECTURES` to a CMake architecture list when building for another machine. `TN_BUILD_JOBS` controls compiler parallelism (default: 4). The same script can build the server directly from a Linux shell:
+
+```bash
+bash scripts/build_llama.sh cpu
+```
+
+The build installs `llama-server` **and its shared libraries** together in `.runtime/dependencies/tn-llama/`. The launcher discovers that server automatically. Keep the directory together when moving it. `build.json` records the backend and SHA-256 of every installed binary and library. `native/tn-llama/source-manifest.json` identifies the included source files and upstream revisions. Model weights are not downloaded by the build.
 
 ## Install Unity and run the complete example
 
@@ -79,14 +107,13 @@ actual LLM request**. It checks the returned report and pending-review registrat
 Docker Desktop must be running with Linux containers, and WSL must be available
 for the TN-enabled model server. The Unity image is pinned by digest.
 
-Place these files in `.runtime/dependencies/` under this checkout:
+Place these external dependencies in `.runtime/dependencies/` under this checkout:
 
 - `tn_proto-2026.9.10b2.dev2-cp39-abi3-win_amd64.whl`
 - `opa.exe`
-- `llama-server` (the TN-enabled Linux executable)
 - One compatible `.gguf` model file
 
-The directory is excluded from Git. Then run:
+The directory is excluded from Git. After building the included server, run:
 
 ```powershell
 py -3.12 scripts/run_submission.py --run-directory experiments/results/full-report

@@ -29,6 +29,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tn-wheel", type=Path, help="Override dependency discovery")
     parser.add_argument("--binary", type=Path, help="Override dependency discovery")
+    parser.add_argument("--build-server", choices=["cpu", "cuda"],
+                        help="Build the included TN server source through WSL before running")
     parser.add_argument("--model-path", type=Path, help="Override dependency discovery")
     parser.add_argument("--opa", type=Path, help="Override dependency discovery")
     parser.add_argument("--dependency-dir", type=Path, default=ROOT / ".runtime/dependencies",
@@ -45,7 +47,7 @@ def main():
     for required in [ROOT / "uv.lock", ROOT / "config/sdk-build.json"]:
         if not required.is_file():
             parser.error(f"Required dependency record is missing: {required}")
-    for name in ("tn_wheel", "binary", "model_path", "opa"):
+    for name in ("tn_wheel", "model_path", "opa"):
         try:
             path = resolve_dependency(name, getattr(args, name), directory=args.dependency_dir)
         except ValueError as error:
@@ -56,6 +58,22 @@ def main():
         parser.error("Run directory must be new")
     if args.rows < 1:
         parser.error("--rows must be positive")
+    if args.build_server:
+        if args.binary:
+            parser.error("Use --build-server or --binary, not both")
+        distribution = os.environ.get("TN_WSL_DISTRO")
+        script = (ROOT / "scripts/build_llama.sh").resolve()
+        if len(script.drive) != 2:
+            parser.error("The server build requires a drive-backed Windows checkout")
+        linux_script = "/mnt/" + script.drive[0].lower() + script.as_posix()[2:]
+        subprocess.run(["wsl", *(["-d", distribution] if distribution else []),
+                        "--", "bash", "-lc", 'exec bash "$1" "$2"', "build-tn",
+                        linux_script, args.build_server], check=True)
+        args.binary = ROOT / ".runtime/dependencies/tn-llama/llama-server"
+    try:
+        args.binary = resolve_dependency("binary", args.binary, directory=args.dependency_dir)
+    except ValueError as error:
+        parser.error(str(error))
     python = args.python.resolve() if args.python else ROOT / ".venv/Scripts/python.exe"
     if not args.python and not python.exists():
         subprocess.run(["py", "-3.12", "-m", "venv", str(ROOT / ".venv")], check=True)

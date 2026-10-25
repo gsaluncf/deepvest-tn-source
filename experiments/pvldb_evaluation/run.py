@@ -134,7 +134,7 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
     repository = Path(__file__).resolve().parents[2]
     root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=False)
-    binary = Path(binary or repository.parent / "tn-llama/build/llama.cpp/cuda-wsl-tn/bin/llama-server").resolve()
+    binary = Path(binary or repository / ".runtime/dependencies/tn-llama/llama-server").resolve()
     model_path = Path(model_path or repository / ".artifacts/models/Qwen3-4B-Q4_K_M.gguf").resolve()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     timings = {}

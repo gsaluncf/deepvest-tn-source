@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = ["crates/tn-runtime", "crates/tn-test-tools"]
+exclude = ["upstream/tn-proto"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"

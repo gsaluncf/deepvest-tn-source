@@ -28,6 +28,12 @@ def wsl_path(path: Path) -> str:
     return "/mnt/" + path.drive[0].lower() + path.as_posix()[2:]
 
 
+def wsl_command():
+    """Use the selected WSL distribution, or the user's default."""
+    distribution = os.environ.get("TN_WSL_DISTRO")
+    return ["wsl", *(["-d", distribution] if distribution else []), "--"]
+
+
 @contextmanager
 def governed_server(
     *, binary: Path, model: Path, config: Path, port: int, api_key: str, wsl: bool = False
@@ -89,10 +95,7 @@ def governed_server(
         launcher = directory / "server-exec.sh"
         launcher.write_text('echo $$ > "$1"\nshift\nexec "$@"\n', encoding="utf-8", newline="\n")
         args = [
-            "wsl",
-            "-d",
-            "codex",
-            "--",
+            *wsl_command(),
             "sh",
             translate(launcher),
             translate(pid_path),
@@ -137,7 +140,7 @@ def governed_server(
                     pid = pid_path.read_text().strip() if pid_path.exists() else ""
                     if pid.isdigit() and int(pid) > 1:
                         subprocess.run(
-                            ["wsl", "-d", "codex", "--", "kill", "-TERM", "--", pid],
+                            [*wsl_command(), "kill", "-TERM", "--", pid],
                             check=False,
                             timeout=10,
                             capture_output=True,

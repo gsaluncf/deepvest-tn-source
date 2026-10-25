@@ -1,0 +1,33 @@
+{
+  "protocol": "tn.llama.request.v1",
+  "tn_row": {
+    "device_identity": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+    "timestamp": "2026-08-23T12:00:00.000000Z",
+    "event_id": "0198d65e-9c00-7000-8000-000000000001",
+    "event_type": "tn.llama.request",
+    "level": "info",
+    "sequence": 1,
+    "prev_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "row_hash": "sha256:568aa1ee7735405eb0d5f2f15d6567a92b424794cce0460c3241ddf19fdd0fee",
+    "signature": "",
+    "tn.agents": {
+      "ciphertext": "AQIDBA==",
+      "field_hashes": {
+        "consequences": "hmac-sha256:v1:0000000000000000000000000000000000000000000000000000000000000011",
+        "do_not_use_for": "hmac-sha256:v1:0000000000000000000000000000000000000000000000000000000000000012",
+        "instruction": "hmac-sha256:v1:0000000000000000000000000000000000000000000000000000000000000013",
+        "on_violation_or_error": "hmac-sha256:v1:0000000000000000000000000000000000000000000000000000000000000014",
+        "policy": "hmac-sha256:v1:0000000000000000000000000000000000000000000000000000000000000015",
+        "use_for": "hmac-sha256:v1:0000000000000000000000000000000000000000000000000000000000000016"
+      }
+    }
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "Reply with exactly READY."
+    }
+  ],
+  "purpose": "tn-llama-live-acceptance",
+  "stream": false
+}

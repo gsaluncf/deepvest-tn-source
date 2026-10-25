@@ -1,0 +1,37 @@
+# TN Agents Policy
+version: 1
+schema: tn-agents-policy@v1
+
+## report.generated
+
+### instruction
+Generate only the configured derived report.
+
+### use_for
+Creating the governed HTML report requested by the user.
+
+### do_not_use_for
+Any ungoverned output or unrelated purpose.
+
+### consequences
+Reject the report and release no output when validation fails.
+
+### on_violation_or_error
+Abort the governed session and record the failing gate.
+
+## compliance.creation.logged
+
+### instruction
+Record the server-authorized creation of a governed derived report.
+
+### use_for
+Creating committed compliance evidence for the configured report operation.
+
+### do_not_use_for
+Authorizing report release or recording unrelated model activity.
+
+### consequences
+Reject the compliance event when trusted invocation facts are invalid.
+
+### on_violation_or_error
+Abort the governed action and record the failing tool gate.
