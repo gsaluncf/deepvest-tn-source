@@ -12,6 +12,8 @@ Consider an analyst allowed to use market data internally. The data also carries
 
 This repository implements that path with synthetic data:
 
+<img src="assets/diagrams/workflow.png" alt="SQL through governed values, a dataframe, and the LLM to a report with review" width="720">
+
 ```text
 SQLite name/value rows
   -> signed source assignments resolved through Unity
@@ -133,6 +135,8 @@ The installer prints the container name and URL. Stop it with
 
 ## Run the numeric verification first
 
+<img src="assets/diagrams/numeric-derivation.png" alt="Two governed Decimal inputs produce a Decimal result linked to both sources" width="640">
+
 This command uses native encryption and signatures without a Unity or model connection:
 
 ```powershell
@@ -232,6 +236,8 @@ result = (
 The context owns the signed operation records. A refusal therefore has a record even when no result is produced. Exposure also has a record even though the returned ordinary Python value carries no governance handle.
 
 ## Run the complete model/report workflow
+
+<img src="assets/diagrams/report-review.png" alt="Required tool, report release, recipient acceptance, signed review registration, and returned draft" width="720">
 
 ```powershell
 py -3.12 scripts/run_submission.py --unity-url http://127.0.0.1:8080 --numeric-type Decimal --run-directory experiments/results/sql-model-report
