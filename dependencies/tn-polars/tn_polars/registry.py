@@ -109,12 +109,18 @@ class UnityCatalogRegistry:
         return _load_edition(dataset, edition, record_id,
                              _local_path(volume.get("storage_location", ""), full))
 
-    def register_edition(self, dataset, edition, record_id, bundle_dir):
+    def register_edition(self, dataset, edition, record_id, bundle_dir, *, create_namespace=True):
+        """Register an edition, optionally creating its catalog and schema first.
+
+        Set create_namespace=False after setup has established those locations.
+        Unity still authorizes every volume creation and lookup.
+        """
         root = Path(bundle_dir).resolve()
         _load_edition(dataset, edition, record_id, root)
         name = f"tn_edition_{_digest(record_id)}"
-        self._ensure("/catalogs", {"name": self.catalog})
-        self._ensure("/schemas", {"name": self.schema, "catalog_name": self.catalog})
+        if create_namespace:
+            self._ensure("/catalogs", {"name": self.catalog})
+            self._ensure("/schemas", {"name": self.schema, "catalog_name": self.catalog})
         self._ensure("/volumes", {
             "catalog_name": self.catalog, "schema_name": self.schema,
             "name": name, "volume_type": "EXTERNAL", "storage_location": root.as_uri(),
