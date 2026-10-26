@@ -112,8 +112,8 @@ def verify(root):
                 if record.body["kind"] != "Monitor":
                     calls[record.body["context_id"], record.body["call_id"]].append(record)
 
-        refusals = []
-        for call in calls.values():
+        refusals, sql_reads_by_call = [], {}
+        for call_key, call in calls.items():
             decisions = [r for r in call if r.body["kind"] == "Decision"]
             require(len(decisions) == 1, "protected call must have exactly one Decision")
             decision = decisions[0]
@@ -130,6 +130,7 @@ def verify(root):
             terminal = [r.body["kind"] for r in call if r.body["kind"] in
                         ("Result", "Refusal", "Disclosure", "Observation", "Failure", "ModelResult")]
             sql_reads = [r for r in call if r.body["kind"] == "SQLRead"]
+            sql_reads_by_call[call_key] = sql_reads
             empty_select = (db["operation"] == "select" and len(sql_reads) == 1
                             and sql_reads[0].body["details"]["row_count"] == 0)
             require(terminal or empty_select, "protected call lacks terminal evidence")
@@ -262,7 +263,7 @@ def verify(root):
                         "SQL source was hydrated under the wrong column assignment")
                 require(actual_policies <= {p["revision"] for p in decision.body["details"]["policies"]},
                         "SQL cell's policy was not included in its query Decision")
-                sql_records = [r for r in calls[rb["context_id"], rb["call_id"]] if r.body["kind"] == "SQLRead"]
+                sql_records = sql_reads_by_call[rb["context_id"], rb["call_id"]]
                 require(len(sql_records) == 1 and sql_records[0].body["sequence"] < rb["sequence"]
                         and sql_records[0].body["details"]["query_id"] == source["query_id"]
                         and sql_records[0].body["details"]["source"] == assignment["source"]

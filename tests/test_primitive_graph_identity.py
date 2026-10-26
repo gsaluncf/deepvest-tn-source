@@ -12,7 +12,7 @@ from tn.governed import GovernedError
 
 from deepvest_tn.publications import PublicationStore
 from experiments.governed_strings.catalog import AssignedRules, UnityGovernance, markdown
-from experiments.governed_strings.evidence import EvidenceError, EvidenceRecorder
+from experiments.governed_strings.evidence import EvidenceError, EvidenceRecorder, Record
 from experiments.governed_strings.metadata import describe
 from experiments.governed_strings.primitives import Context, SCHEMA, VALUE_TYPE
 from experiments.governed_strings.provision import provision
@@ -25,10 +25,12 @@ from experiments.governed_strings.verify import verify
 @pytest.fixture
 def batch_run(tmp_path, monkeypatch, request):
     """Real native keys, policies, signatures and records; catalog transport is local."""
+    options = getattr(request, "param", {})
+    row_count = options.get("rows", 2)
     database = tmp_path / "source.sqlite"
     with sqlite3.connect(database) as connection:
         connection.execute("CREATE TABLE people (name TEXT NOT NULL)")
-        connection.executemany("INSERT INTO people VALUES (?)", [("Ada",), ("Ada",)])
+        connection.executemany("INSERT INTO people VALUES (?)", [("Ada",)] * row_count)
     identity = source_identity(database)
     paths = provision(tmp_path / "sessions", roles=["catalog", "gateway", "observer"])
     locations = {}
@@ -66,16 +68,16 @@ def batch_run(tmp_path, monkeypatch, request):
         context = Context(session, recorder, rules, application="test", purpose="internal",
                           actor="analyst", resolver=resolvers["gateway"])
         policy = resolution.policies["name"]
-        options = getattr(request, "param", {})
         operation = Request("test", "internal", "select", (), (), (policy,), ())
         decision = context._decision(operation, "query")
-        context._append("SQLRead", operation, "query", {"decision_id": decision,
-            "query_id": "query", "row_count": 2, "source": identity, "assignment_id": assignment_id})
+        for _ in range(options.get("sql_read_count", 1)):
+            context._append("SQLRead", operation, "query", {"decision_id": decision,
+                "query_id": "query", "row_count": row_count, "source": identity, "assignment_id": assignment_id})
         sources = [{"table": "people", "column": "name", "row": row, "query_id": "query",
                     "assignment_id": assignment_id, "snapshot_sha256": identity["snapshot_sha256"]}
-                   for row in range(2)]
+                   for row in range(row_count)]
         sources[1].update(options.get("second_source", {}))
-        fields = {f"value_{row}": "Ada" for row in range(2)}
+        fields = {f"value_{row}": "Ada" for row in range(row_count)}
         data = session.create(fields, policy, object_type=VALUE_TYPE, group="values")
         store.put(data.snapshot)
         bindings = {field: {"claims": [], "parents": [], "decision_id": decision,
@@ -130,6 +132,37 @@ def test_equal_sibling_values_keep_distinct_nodes_and_evidence(batch_run):
     assert {node["result_id"] for node in graph["nodes"]} == {
         value["result_id"] for value in run["outputs"].values()}
     assert len({node["object_id"] for node in graph["nodes"]}) == 1
+
+
+@pytest.mark.parametrize("batch_run", [{"sql_read_count": 0}, {"sql_read_count": 2}], indirect=True)
+def test_source_batch_requires_exactly_one_signed_sql_read(batch_run):
+    root, _ = batch_run
+    with pytest.raises(EvidenceError, match="authorized SQL read"):
+        verify(root)
+
+
+@pytest.mark.parametrize("batch_run", [{"rows": 64}], indirect=True)
+def test_record_selection_work_is_linear_in_batch_size(batch_run, monkeypatch):
+    from experiments.governed_strings import verify as module
+
+    root, _ = batch_run
+    original = module.verify_tape
+    counts = Counter()
+
+    class CountedBody(dict):
+        def __getitem__(self, key):
+            if key == "kind":
+                counts["kind_checks"] += 1
+            return super().__getitem__(key)
+
+    def counted_records(*args, **kwargs):
+        records = original(*args, **kwargs)
+        counts["records"] += len(records)
+        return tuple(Record(record.id, record.writer, CountedBody(record.body)) for record in records)
+
+    monkeypatch.setattr(module, "verify_tape", counted_records)
+    assert verify(root)["incarnations"] == 64
+    assert counts["kind_checks"] <= 20 * counts["records"]
 
 
 @pytest.mark.parametrize("part", ["result_id", "field"])
