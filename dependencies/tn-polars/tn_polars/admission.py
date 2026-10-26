@@ -11,10 +11,8 @@ class SchemaPinViolation(PolicyDenied):
 def admit(frame, policy, tn_governance, evaluator, *, dtypes=None, label_map=None):
     """Return a governed frame only when the frame schema equals the policy schema.
 
-    The pin is exact in both directions. A column the policy never classified
-    halts admission, because the generated reading cannot cover it. A policy
-    column missing from the data halts admission, because the reading was
-    compiled for a different record shape.
+    Both schemas must contain the same columns. Admission fails if an input
+    column has no policy or a column required by the policy is missing.
     """
     schema = frame.collect_schema()
     arrived = set(schema.names())

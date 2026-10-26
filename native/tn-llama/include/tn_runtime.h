@@ -55,7 +55,7 @@ typedef struct tn_native_tool_result {
     uint8_t stop_limit;
 } tn_native_tool_result;
 
-/* Receiver-local model-binding input for later per-transition governance evidence. */
+/* Check the observed model SHA-256 against receiver configuration. */
 int32_t tn_governance_model_binding_authorized(
                           tn_bytes_view observed_model_sha256,
                           uint8_t *out_authorized,

@@ -30,7 +30,7 @@ impl Fixture {
     pub fn new() -> Self {
         let legacy = tn_test_tools::build_real_tn_fixture().unwrap();
         let manifest: Value =
-            serde_json::from_str(include_str!("../fixtures/governed/m1-manifest.json")).unwrap();
+            serde_json::from_str(include_str!("../fixtures/governed/manifest.json")).unwrap();
         let input = legacy.temp.path().join("native-input");
         let keys = input.join("keys");
         let reader = input.join("reader");

@@ -6,11 +6,11 @@ import pytest
 import tn
 
 from deepvest_tn.publications import PublicationStore
-from experiments.governed_strings.evidence import EvidenceRecorder, read_record
-from experiments.governed_strings.model import NativeModelEndpoint, prepare_native_model
-from experiments.governed_strings.primitives import Context, VALUE_TYPE
-from experiments.governed_strings.runtime import Assessment, Request
-from experiments.governed_strings.string import OperationDenied, TNString, ValueReference
+from deepvest_tn.governed.evidence import EvidenceRecorder, read_record
+from deepvest_tn.governed.model import NativeModelEndpoint, prepare_native_model
+from deepvest_tn.governed.primitives import Context, VALUE_TYPE
+from deepvest_tn.governed.runtime import Assessment, Request
+from deepvest_tn.governed.string import OperationDenied, TNString, ValueReference
 
 
 POLICY = """## experiment.primitive
@@ -118,7 +118,7 @@ def test_protected_handoff_records_failure_without_submitting_siblings(source_va
     def reached(source, **kwargs):
         submissions.append(source)
         raise TransportReached()
-    monkeypatch.setattr("experiments.governed_strings.model.submit_governed_report", reached)
+    monkeypatch.setattr("deepvest_tn.governed.model.submit_governed_report", reached)
     count = len(context.recorder.records())
     with context, pytest.raises(OperationDenied, match="standalone governed value"):
         target.generate(value, prompt="Summarize the selected value.")
@@ -151,7 +151,7 @@ def test_sole_cited_field_continues_to_native_transport(source_values, tmp_path,
     def reached(source, **kwargs):
         submissions.append(source)
         raise TransportReached()
-    monkeypatch.setattr("experiments.governed_strings.model.submit_governed_report", reached)
+    monkeypatch.setattr("deepvest_tn.governed.model.submit_governed_report", reached)
     count = len(context.recorder.records())
     with context, pytest.raises(TransportReached):
         target.generate(value, prompt="Summarize the selected value.")

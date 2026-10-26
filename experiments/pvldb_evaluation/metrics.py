@@ -60,8 +60,8 @@ class Profiler:
         setattr(cls, name, measured)
 
     def __enter__(self):
-        from experiments.governed_strings.primitives import Context
-        from experiments.governed_strings.evidence import EvidenceRecorder
+        from deepvest_tn.governed.primitives import Context
+        from deepvest_tn.governed.evidence import EvidenceRecorder
         from deepvest_tn.publications import PublicationStore
         from deepvest_tn.sqlite_publications import SQLitePublicationStore
         from tn_polars.tn_boundary import PolicySet

@@ -1,4 +1,4 @@
-//! Materialize the existing standalone governed fixture for cross-process tests.
+//! Materialize the standalone governed fixture for cross-process tests.
 //! All keys in this fixture are test material. Never configure a deployed service with them.
 #[path = "../tests/governed_support/mod.rs"]
 mod governed_support;

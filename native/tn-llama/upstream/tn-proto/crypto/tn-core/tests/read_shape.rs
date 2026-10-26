@@ -1,4 +1,4 @@
-//! Tests for the 2026-04-25 read-ergonomics reshape.
+//! Tests for flat and raw event reads.
 //!
 //! Mirrors `python/tests/test_read_shape.py` cases — flat default,
 //! verify, raw, hidden groups, decrypt errors, collisions.

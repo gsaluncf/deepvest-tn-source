@@ -58,8 +58,7 @@ pub struct ReadEntry {
 /// envelope's group structure. Crypto plumbing (`prev_hash`, `row_hash`,
 /// `signature`, ciphertext blocks) is dropped. `_hidden_groups` /
 /// `_decrypt_errors` marker keys appear only when non-empty;
-/// [`Runtime::read_with_verify`] adds a `_valid` block. Per the
-/// 2026-04-25 read-ergonomics spec §1.1.
+/// [`Runtime::read_with_verify`] adds a `_valid` block.
 pub type FlatEntry = Map<String, Value>;
 
 /// Per-entry validity flags surfaced by [`Runtime::read_raw_with_validity`]
@@ -272,7 +271,7 @@ pub struct ReadReport<T> {
     pub cursor: ReadCursorV1,
 }
 
-/// What [`Runtime::secure_read`] does on a non-verifying entry. Per spec §3.1.
+/// What [`Runtime::secure_read`] does when an entry fails verification.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum OnInvalid {
     /// Silently drop. A `tn.read.tampered_row_skipped` event is appended

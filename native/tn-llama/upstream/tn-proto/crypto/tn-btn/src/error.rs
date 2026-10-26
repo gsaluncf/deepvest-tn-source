@@ -1,8 +1,6 @@
 //! Error types.
 //!
-//! Every error here names the exact location, the specific problem, and
-//! the next step. The audience is a novice programmer or an LLM agent
-//! reading the error in a stack trace.
+//! Error messages identify invalid parameters and failed operations.
 
 use thiserror::Error;
 

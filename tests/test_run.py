@@ -33,11 +33,11 @@ from deepvest_tn import run as run_module
 from deepvest_tn.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
 from deepvest_tn.getdata import FeedFetchHTTPError, FeedFetchResponseError, FetchedFeed
 from deepvest_tn.run import (
-    FirstPassConfig,
-    FirstPassResult,
+    PortfolioDemoConfig,
+    PortfolioDemoResult,
     GovernedServerSpec,
     ReferenceRunConfig,
-    run_first_pass,
+    run_portfolio_demo,
     run_reference_path,
 )
 from deepvest_tn.tn_flow import TNFlowResult
@@ -54,9 +54,8 @@ _ACTIVE_FEED_URL = ""
 
 def test_report_prompt_pins_the_mandatory_disclosure_as_the_final_paragraph() -> None:
     fixed_narrative = (
-        "This first-pass report demonstrates governed transport of supplied portfolio "
-        "positions and provided DeepVest stub risk metrics without recalculation; it does "
-        "not claim data-specific narrative generation."
+        "This report contains supplied portfolio positions and DeepVest stub risk metrics. "
+        "The metrics and narrative are fixed."
     )
     disclosure_paragraph = f"<p>{run_module._STUB_DISCLOSURE}</p>"
 
@@ -67,8 +66,6 @@ def test_report_prompt_pins_the_mandatory_disclosure_as_the_final_paragraph() ->
         f"<p>{fixed_narrative}</p>\n{disclosure_paragraph}\n</body></html>"
         in run_module._REPORT_PROMPT
     )
-    assert "Write the concise portfolio narrative here" not in run_module._REPORT_PROMPT
-    assert "Place the narrative next" not in run_module._REPORT_PROMPT
     assert (
         "Do not call emit_governed_record until report_html ends with that exact final "
         "disclosure paragraph."
@@ -160,7 +157,7 @@ def _canonical_release_body(flow: TNFlowResult) -> bytes:
         f"{template.path}#{template.event_type}@{template.version}#{template.content_hash}"
     )
     report_html = (
-        "<p>DeepVest calculations in this first-pass report are deterministic "
+        "<p>DeepVest calculations in this report are deterministic "
         "stub outputs, not live DeepVest results.</p>"
     )
     emitted = writer.log(
@@ -268,16 +265,16 @@ def _install_fake_local_dependencies(
     return build_directory, server_path, model_path
 
 
-def _first_pass_case(
+def _portfolio_demo_case(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     *,
     name: str,
-) -> tuple[Path, FirstPassConfig]:
+) -> tuple[Path, PortfolioDemoConfig]:
     project_root = tmp_path / "project"
     _install_fake_local_dependencies(monkeypatch, project_root)
     run_directory = (project_root / "experiments" / "results" / name).resolve()
-    return project_root, FirstPassConfig(
+    return project_root, PortfolioDemoConfig(
         run_directory=run_directory,
         unity_url="http://127.0.0.1:18080",
         llama_port=_free_port(),
@@ -360,7 +357,7 @@ def test_reference_run_executes_the_tn_object_path_through_the_governed_route(
     assert summary["tn_llama"]["route"] == "/v1/tn/chat/completions"
 
 
-def test_first_pass_composes_real_stages_and_saves_only_recipient_opened_output(
+def test_portfolio_demo_composes_real_stages_and_saves_only_recipient_opened_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
@@ -437,8 +434,8 @@ def test_first_pass_composes_real_stages_and_saves_only_recipient_opened_output(
         events.append("server_exit")
 
     before = {path.relative_to(project_root) for path in project_root.rglob("*")}
-    result = run_first_pass(
-        FirstPassConfig(
+    result = run_portfolio_demo(
+        PortfolioDemoConfig(
             run_directory=run_directory,
             unity_url=unity_url,
             llama_port=port,
@@ -448,7 +445,7 @@ def test_first_pass_composes_real_stages_and_saves_only_recipient_opened_output(
         server_lifecycle_factory=governed_transport,
     )
 
-    assert isinstance(result, FirstPassResult)
+    assert isinstance(result, PortfolioDemoResult)
     assert isinstance(result.release, ReportRelease)
     assert result.report_path.read_text(encoding="utf-8") == result.release.report_html
     assert result.summary_path == run_directory / "run-summary.json"
@@ -477,7 +474,7 @@ def test_first_pass_composes_real_stages_and_saves_only_recipient_opened_output(
     assert request_body["tn_row"] == dict(flow.source_row.envelope)
     assert "only the finance section" in request_body["messages"][0]["content"]
     assert (
-        "DeepVest calculations in this first-pass report are deterministic stub outputs, "
+        "DeepVest calculations in this report are deterministic stub outputs, "
         "not live DeepVest results."
     ) in request_body["messages"][0]["content"]
 
@@ -493,7 +490,7 @@ def test_first_pass_composes_real_stages_and_saves_only_recipient_opened_output(
 
     summary = json.loads(result.summary_path.read_text(encoding="utf-8"))
     assert summary == {
-        "profile": "first_pass",
+        "profile": "portfolio_demo",
         "account_id": "acct-001",
         "unity": {
             "role": "governance_source",
@@ -623,7 +620,7 @@ def test_first_pass_composes_real_stages_and_saves_only_recipient_opened_output(
     )
 
 
-def test_first_pass_scopes_no_bytecode_and_tn_environment_then_restores_it(
+def test_portfolio_demo_scopes_no_bytecode_and_tn_environment_then_restores_it(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -654,8 +651,8 @@ def test_first_pass_scopes_no_bytecode_and_tn_environment_then_restores_it(
     monkeypatch.setattr("tn_polars.registry.UnityCatalogRegistry._request", unavailable)
 
     with pytest.raises(ConnectionError, match="Unity outage"):
-        run_first_pass(
-            FirstPassConfig(
+        run_portfolio_demo(
+            PortfolioDemoConfig(
                 run_directory=(project_root / "experiments" / "results" / "env-failure").resolve(),
                 unity_url="http://127.0.0.1:18080",
                 llama_port=_free_port(),
@@ -675,7 +672,7 @@ def test_unavailable_getdata_stops_before_deepvest_or_tn(
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
 ) -> None:
-    _project_root, config = _first_pass_case(tmp_path, monkeypatch, name="getdata-denied")
+    _project_root, config = _portfolio_demo_case(tmp_path, monkeypatch, name="getdata-denied")
     config = replace(config, feed_url="http://127.0.0.1:1")
     _install_unity_transport(monkeypatch, finance_bundles, base_url=config.unity_url)
     calls: list[str] = []
@@ -691,7 +688,7 @@ def test_unavailable_getdata_stops_before_deepvest_or_tn(
     monkeypatch.setattr(run_module, "provision_tn_flow", unexpected("tn"))
 
     with pytest.raises(FeedFetchHTTPError):
-        run_first_pass(config)
+        run_portfolio_demo(config)
 
     assert calls == []
 
@@ -715,7 +712,7 @@ def test_pre_deepvest_getdata_denials_never_reach_deepvest_or_tn(
 ) -> None:
     import deepvest_tn.polars_stage as polars_stage
 
-    _project_root, config = _first_pass_case(tmp_path, monkeypatch, name=f"getdata-{failure}")
+    _project_root, config = _portfolio_demo_case(tmp_path, monkeypatch, name=f"getdata-{failure}")
     _install_unity_transport(monkeypatch, finance_bundles, base_url=config.unity_url)
     real_fetch = polars_stage.fetch_feed
     calls: list[str] = []
@@ -752,18 +749,18 @@ def test_pre_deepvest_getdata_denials_never_reach_deepvest_or_tn(
     monkeypatch.setattr(run_module, "provision_tn_flow", forbidden("tn"))
 
     with pytest.raises(expected_error):
-        run_first_pass(config)
+        run_portfolio_demo(config)
 
     assert calls == []
 
 
 @pytest.mark.parametrize("feed_url", ["https://127.0.0.1:18082", "http://example.test:18082"])
-def test_first_pass_rejects_non_loopback_or_non_http_feed_url_before_any_boundary(
+def test_portfolio_demo_rejects_non_loopback_or_non_http_feed_url_before_any_boundary(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     feed_url: str,
 ) -> None:
-    _project_root, config = _first_pass_case(tmp_path, monkeypatch, name="invalid-feed-url")
+    _project_root, config = _portfolio_demo_case(tmp_path, monkeypatch, name="invalid-feed-url")
     calls: list[str] = []
     monkeypatch.setattr(
         run_module,
@@ -772,7 +769,7 @@ def test_first_pass_rejects_non_loopback_or_non_http_feed_url_before_any_boundar
     )
 
     with pytest.raises(ValueError, match="Feed URL"):
-        run_first_pass(replace(config, feed_url=feed_url))
+        run_portfolio_demo(replace(config, feed_url=feed_url))
 
     assert calls == []
 
@@ -782,7 +779,7 @@ def test_tn_root_link_is_refused_before_provisioning_or_outside_mutation(
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
 ) -> None:
-    _project_root, config = _first_pass_case(tmp_path, monkeypatch, name="tn-root-link")
+    _project_root, config = _portfolio_demo_case(tmp_path, monkeypatch, name="tn-root-link")
     _install_unity_transport(monkeypatch, finance_bundles, base_url=config.unity_url)
     outside = tmp_path / "outside-tn"
     outside.mkdir()
@@ -805,7 +802,7 @@ def test_tn_root_link_is_refused_before_provisioning_or_outside_mutation(
     monkeypatch.setattr(run_module, "provision_tn_flow", unexpected_provision)
 
     with pytest.raises(ValueError, match="outside the run directory"):
-        run_first_pass(config)
+        run_portfolio_demo(config)
 
     assert provision_calls == []
     assert list(outside.iterdir()) == []
@@ -819,7 +816,7 @@ def test_unity_failure_stops_before_deepvest_tn_server_and_release(
     finance_bundles: dict[str, Path],
     failure: str,
 ) -> None:
-    _project_root, config = _first_pass_case(
+    _project_root, config = _portfolio_demo_case(
         tmp_path,
         monkeypatch,
         name=f"unity-{failure}",
@@ -865,7 +862,7 @@ def test_unity_failure_stops_before_deepvest_tn_server_and_release(
     )
 
     with pytest.raises(expected_error):
-        run_first_pass(
+        run_portfolio_demo(
             config,
             server_lifecycle_factory=lambda _spec: (_ for _ in ()).throw(
                 AssertionError("server must not start")
@@ -884,7 +881,7 @@ def test_admission_or_governance_failure_stops_before_deepvest_and_tn(
     local_getdata_service: tuple[str, Path],
     failure: str,
 ) -> None:
-    _project_root, config = _first_pass_case(
+    _project_root, config = _portfolio_demo_case(
         tmp_path,
         monkeypatch,
         name=f"polars-{failure}",
@@ -935,7 +932,7 @@ def test_admission_or_governance_failure_stops_before_deepvest_and_tn(
 
     try:
         with pytest.raises(expected_error):
-            run_first_pass(
+            run_portfolio_demo(
                 config,
                 server_lifecycle_factory=lambda _spec: (_ for _ in ()).throw(
                     AssertionError("server must not start")
@@ -954,7 +951,7 @@ def test_deepvest_exception_is_attempted_once_and_stops_before_tn_or_network(
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
 ) -> None:
-    _project_root, config = _first_pass_case(
+    _project_root, config = _portfolio_demo_case(
         tmp_path,
         monkeypatch,
         name="deepvest-failure",
@@ -976,7 +973,7 @@ def test_deepvest_exception_is_attempted_once_and_stops_before_tn_or_network(
     )
 
     with pytest.raises(RuntimeError, match="stub boundary failure"):
-        run_first_pass(
+        run_portfolio_demo(
             config,
             server_lifecycle_factory=lambda _spec: (_ for _ in ()).throw(
                 AssertionError("server must not start")
@@ -994,7 +991,7 @@ def test_invalid_tn_handoff_stops_before_server_and_http(
     finance_bundles: dict[str, Path],
     failure: str,
 ) -> None:
-    _project_root, config = _first_pass_case(
+    _project_root, config = _portfolio_demo_case(
         tmp_path,
         monkeypatch,
         name=f"tn-{failure}",
@@ -1023,7 +1020,7 @@ def test_invalid_tn_handoff_stops_before_server_and_http(
         yield
 
     with pytest.raises(ValueError):
-        run_first_pass(config, server_lifecycle_factory=forbidden_server)
+        run_portfolio_demo(config, server_lifecycle_factory=forbidden_server)
 
     assert server_calls == []
     assert not (config.run_directory / "client" / "http.ndjson").exists()
@@ -1035,7 +1032,7 @@ def test_server_start_failure_saves_no_report_or_summary(
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
 ) -> None:
-    _project_root, config = _first_pass_case(
+    _project_root, config = _portfolio_demo_case(
         tmp_path,
         monkeypatch,
         name="server-start-failure",
@@ -1050,7 +1047,7 @@ def test_server_start_failure_saves_no_report_or_summary(
         yield
 
     with pytest.raises(TimeoutError, match="readiness"):
-        run_first_pass(config, server_lifecycle_factory=failed_start)
+        run_portfolio_demo(config, server_lifecycle_factory=failed_start)
 
     assert len(calls) == 1
     assert not (config.run_directory / "client" / "http.ndjson").exists()
@@ -1074,7 +1071,7 @@ def test_governed_or_output_denial_saves_no_report_or_success_summary(
     failure: str,
     expected_error,
 ) -> None:
-    _project_root, config = _first_pass_case(
+    _project_root, config = _portfolio_demo_case(
         tmp_path,
         monkeypatch,
         name=f"downstream-{failure}",
@@ -1116,7 +1113,7 @@ def test_governed_or_output_denial_saves_no_report_or_success_summary(
             yield
 
     with pytest.raises(expected_error):
-        run_first_pass(config, server_lifecycle_factory=denied_transport)
+        run_portfolio_demo(config, server_lifecycle_factory=denied_transport)
 
     assert len(handoff["requests"]) == 1
     _assert_no_released_outputs(config.run_directory)
@@ -1131,7 +1128,7 @@ def test_symlinked_output_directory_is_refused_before_http_or_outside_write(
     finance_bundles: dict[str, Path],
     escaped_directory: str,
 ) -> None:
-    _project_root, config = _first_pass_case(
+    _project_root, config = _portfolio_demo_case(
         tmp_path,
         monkeypatch,
         name=f"symlink-{escaped_directory}",
@@ -1162,7 +1159,7 @@ def test_symlinked_output_directory_is_refused_before_http_or_outside_write(
             yield
 
     with pytest.raises(ValueError, match="outside the run directory"):
-        run_first_pass(config, server_lifecycle_factory=escaped_transport)
+        run_portfolio_demo(config, server_lifecycle_factory=escaped_transport)
 
     assert handoff["requests"] == []
     assert list(outside.iterdir()) == []
@@ -1176,7 +1173,7 @@ def test_symlinked_prelaunch_directory_is_refused_before_outside_write(
     finance_bundles: dict[str, Path],
     escaped_directory: str,
 ) -> None:
-    _project_root, config = _first_pass_case(
+    _project_root, config = _portfolio_demo_case(
         tmp_path,
         monkeypatch,
         name=f"prelaunch-symlink-{escaped_directory}",
@@ -1213,7 +1210,7 @@ def test_symlinked_prelaunch_directory_is_refused_before_outside_write(
         monkeypatch.setattr(run_module, "write_finance_runtime_config", observed_boundary)
 
     with pytest.raises(ValueError, match="outside the run directory"):
-        run_first_pass(config)
+        run_portfolio_demo(config)
 
     assert list(outside.iterdir()) == []
     _assert_no_released_outputs(config.run_directory)
@@ -1224,7 +1221,7 @@ def test_occupied_port_is_refused_after_runtime_config_and_before_build_staging(
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
 ) -> None:
-    _project_root, config = _first_pass_case(tmp_path, monkeypatch, name="occupied-port")
+    _project_root, config = _portfolio_demo_case(tmp_path, monkeypatch, name="occupied-port")
     _install_unity_transport(monkeypatch, finance_bundles, base_url=config.unity_url)
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
@@ -1232,7 +1229,7 @@ def test_occupied_port_is_refused_after_runtime_config_and_before_build_staging(
         occupied = replace(config, llama_port=int(listener.getsockname()[1]))
 
         with pytest.raises(RuntimeError, match="occupied"):
-            run_first_pass(occupied)
+            run_portfolio_demo(occupied)
 
     assert (config.run_directory / "runtime" / "runtime-config.json").is_file()
     assert not (config.run_directory / "execution").exists()
@@ -1246,7 +1243,7 @@ def test_existing_run_directory_is_refused_before_any_boundary(
     monkeypatch.setattr(run_module, "_PROJECT_ROOT", tmp_path.resolve())
     run_directory = tmp_path / "existing-run"
     run_directory.mkdir()
-    config = FirstPassConfig(
+    config = PortfolioDemoConfig(
         run_directory=run_directory.resolve(),
         unity_url="http://127.0.0.1:18080",
         llama_port=18180,
@@ -1254,7 +1251,7 @@ def test_existing_run_directory_is_refused_before_any_boundary(
     )
 
     with pytest.raises(FileExistsError, match="run directory"):
-        run_first_pass(config)
+        run_portfolio_demo(config)
 
 
 @pytest.mark.parametrize("kind", ("relative", "outside"))
@@ -1269,8 +1266,8 @@ def test_run_directory_must_resolve_beneath_the_project_without_creating_it(
     candidate = Path("relative-run") if kind == "relative" else (tmp_path / "outside-run")
 
     with pytest.raises(ValueError, match="absolute|beneath"):
-        run_first_pass(
-            FirstPassConfig(
+        run_portfolio_demo(
+            PortfolioDemoConfig(
                 run_directory=candidate,
                 unity_url="http://127.0.0.1:18080",
                 llama_port=18180,
@@ -1298,8 +1295,8 @@ def test_run_directory_containment_resolves_a_symlinked_parent(
     candidate = link / "run"
 
     with pytest.raises(ValueError, match="beneath"):
-        run_first_pass(
-            FirstPassConfig(
+        run_portfolio_demo(
+            PortfolioDemoConfig(
                 run_directory=candidate.absolute(),
                 unity_url="http://127.0.0.1:18080",
                 llama_port=18180,
@@ -1667,10 +1664,12 @@ def test_server_lifecycle_refuses_an_occupied_port_before_spawn(
     assert popen_calls == []
 
 
+@pytest.mark.parametrize("command", ["portfolio-demo", "first-pass"])
 def test_cli_uses_env_only_key_real_lifecycle_and_restores_containment_environment(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    command: str,
 ) -> None:
     sentinel = "cli-key-must-not-print"
     monkeypatch.setenv("TN_LLAMA_API_KEY", sentinel)
@@ -1678,11 +1677,11 @@ def test_cli_uses_env_only_key_real_lifecycle_and_restores_containment_environme
     monkeypatch.setenv("TN_NO_LINK", "previous-link")
     monkeypatch.delenv("TN_NO_STDOUT", raising=False)
     monkeypatch.setenv("TN_AUTOINIT_QUIET", "previous-quiet")
-    observed: list[FirstPassConfig] = []
+    observed: list[PortfolioDemoConfig] = []
     report_path = tmp_path / "run" / "reports" / "event.html"
     summary_path = tmp_path / "run" / "run-summary.json"
 
-    def fake_run(config: FirstPassConfig) -> object:
+    def fake_run(config: PortfolioDemoConfig) -> object:
         observed.append(config)
         assert os.environ["PYTHONDONTWRITEBYTECODE"] == "1"
         assert os.environ["TN_NO_LINK"] == "1"
@@ -1690,11 +1689,11 @@ def test_cli_uses_env_only_key_real_lifecycle_and_restores_containment_environme
         assert os.environ["TN_AUTOINIT_QUIET"] == "1"
         return SimpleNamespace(report_path=report_path, summary_path=summary_path)
 
-    monkeypatch.setattr(run_module, "run_first_pass", fake_run)
+    monkeypatch.setattr(run_module, "run_portfolio_demo", fake_run)
 
     exit_code = cli_module.main(
         [
-            "first-pass",
+            command,
             "--run-directory",
             str((tmp_path / "run").resolve()),
             "--feed-url",
@@ -1706,7 +1705,7 @@ def test_cli_uses_env_only_key_real_lifecycle_and_restores_containment_environme
 
     assert exit_code == 0
     assert observed == [
-        FirstPassConfig(
+        PortfolioDemoConfig(
             run_directory=(tmp_path / "run").resolve(),
             unity_url="http://127.0.0.1:18080",
             llama_port=18182,
@@ -1766,7 +1765,7 @@ def test_cli_refuses_missing_key_and_has_no_api_key_argument(
 ) -> None:
     monkeypatch.delenv("TN_LLAMA_API_KEY", raising=False)
     common = [
-        "first-pass",
+        "portfolio-demo",
         "--run-directory",
         str((tmp_path / "run").resolve()),
         "--unity-url",
@@ -1790,13 +1789,13 @@ def test_powershell_wrapper_uses_project_command_and_restores_absent_environment
     tmp_path: Path,
 ) -> None:
     real_project = Path(__file__).resolve().parents[1]
-    real_wrapper = real_project / "scripts" / "run-first-pass.ps1"
+    real_wrapper = real_project / "scripts" / "run-portfolio-demo.ps1"
     real_command = Path(sys.executable).parent / "deepvest-tn.exe"
     assert real_command.is_file()
 
     workspace = tmp_path / "workspace"
     project = workspace / "application"
-    wrapper = project / "scripts" / "run-first-pass.ps1"
+    wrapper = project / "scripts" / "run-portfolio-demo.ps1"
     project_command = project / ".venv" / "Scripts" / "deepvest-tn.exe"
     wrapper.parent.mkdir(parents=True)
     project_command.parent.mkdir(parents=True)
@@ -1960,7 +1959,7 @@ def test_powershell_wrapper_uses_project_command_and_restores_absent_environment
         observed = json.loads(capture.read_text(encoding="utf-8"))
         assert observed == {
             "arguments": [
-                "first-pass",
+                "portfolio-demo",
                 "--run-directory",
                 str(expected_run),
                 "--unity-url",

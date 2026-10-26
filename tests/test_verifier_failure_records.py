@@ -7,8 +7,8 @@ import pytest
 import tn
 
 from deepvest_tn.publications import PublicationStore
-from experiments.governed_strings.evidence import EvidenceError, EvidenceRecorder
-from experiments.governed_strings.verify import verify
+from deepvest_tn.governed.evidence import EvidenceError, EvidenceRecorder
+from deepvest_tn.governed.verify import verify
 from test_primitive_graph_identity import batch_run as batch_run
 
 

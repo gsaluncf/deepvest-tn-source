@@ -1,10 +1,9 @@
 """SQL cells through governed Polars to one governed numeric result.
 
-This experiment adapter implements one protected ``dataframe_calculate`` call.
-Its intermediate lazy frames retain the same native working object and complete
-contracts. Only the final numeric result is published. Native TN,
-catalog admission, OPA evaluation, Polars lineage, and Context evidence perform
-their usual work; this module supplies the cell-to-frame application glue.
+This adapter implements one protected ``dataframe_calculate`` call. Intermediate
+lazy frames retain separate native copies with the contributing contracts.
+Catalog admission and OPA checks precede data access. Polars tracks the source
+rows and columns, and the context publishes the numeric result with signed records.
 """
 
 from copy import deepcopy
@@ -27,13 +26,13 @@ from tn_polars.support import Support
 from tn_polars.tn_boundary import PolicySet, TnBoundary, root_name
 
 from deepvest_tn.unity import FinanceEditionRequest, resolve_finance_editions
-from experiments.governed_strings.catalog import ReceivedEdition, UnityGovernance, markdown
-from experiments.governed_strings.evidence import EvidenceError
-from experiments.governed_strings.numeric import TNNumeric
-from experiments.governed_strings.numeric_codec import KINDS, record_value
+from deepvest_tn.governed.catalog import ReceivedEdition, UnityGovernance, markdown
+from deepvest_tn.governed.evidence import EvidenceError
+from deepvest_tn.governed.numeric import TNNumeric
+from deepvest_tn.governed.numeric_codec import KINDS, record_value
 from .numeric_profile import numeric_profile, polars_dtype, build_frame, check_fixed_plan_range
-from experiments.governed_strings.primitives import Context, OPERATIONS
-from experiments.governed_strings.string import OperationDenied, TNString, _active
+from deepvest_tn.governed.primitives import Context, OPERATIONS
+from deepvest_tn.governed.string import OperationDenied, TNString, _active
 
 
 OPERATION = "dataframe_calculate"

@@ -1,6 +1,6 @@
 """Run numeric integration checks with actual native encryption and signed evidence.
 
-Run: python -m experiments.governed_strings.verify_numeric
+Run: python -m deepvest_tn.governed.verify_numeric
 This exercises local endpoints; it does not invoke Unity or a model service.
 """
 

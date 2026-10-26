@@ -52,15 +52,19 @@ Record outstanding actions and retain the report's source lineage.
 
 
 def main():
-    repository = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--unity-url", default="http://127.0.0.1:8080")
+    parser.add_argument("--project-directory", type=Path, default=Path.cwd(),
+                        help="Project containing config/sdk-build.json and the pinned dependencies")
     parser.add_argument("--run-directory", type=Path)
-    parser.add_argument("--binary", type=Path, default=repository / ".runtime/dependencies/tn-llama/llama-server")
-    parser.add_argument("--model", type=Path, default=repository / ".artifacts/models/Qwen3-4B-Q4_K_M.gguf")
+    parser.add_argument("--binary", type=Path)
+    parser.add_argument("--model", type=Path)
     parser.add_argument("--port", type=int, default=18325)
     parser.add_argument("--native-windows", action="store_true", help="use a compatible Windows native binary instead of WSL")
     args = parser.parse_args()
+    repository = args.project_directory.resolve()
+    args.binary = args.binary or repository / ".runtime/dependencies/tn-llama/llama-server"
+    args.model = args.model or repository / ".artifacts/models/Qwen3-4B-Q4_K_M.gguf"
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid4().hex[:6]
     root = (args.run_directory or repository / "experiments/results" / ("primitive-review-workflow-" + stamp)).resolve()
     sdk = json.loads((repository / "config/sdk-build.json").read_text())
@@ -174,9 +178,9 @@ def main():
                     "native_module_sha256": digest(native_module), "wheel_sha256": sdk["wheel_sha256"],
                     "repository_commit": subprocess.run(["git", "rev-parse", "HEAD"], cwd=repository,
                                                          text=True, capture_output=True, check=True).stdout.strip(),
-                    "experiment_source_sha256": {p.relative_to(repository).as_posix(): digest(p)
+                    "experiment_source_sha256": {"deepvest_tn/governed/" + p.name: digest(p)
                         for p in sorted(Path(__file__).parent.glob("*.py"))}},
-                "scope": "Synthetic demonstration policy; no Bloomberg feed, vendor endorsement, or actual-license claim. No internal tests.",
+                "scope": "Synthetic market data and demonstration policy.",
             }
             write_once(root / "run.json", json.dumps(manifest, indent=2).encode())
     print(f"Report: {root / 'report.html'}", flush=True)

@@ -4,11 +4,11 @@ import pytest
 import tn
 
 from deepvest_tn.publications import PublicationStore
-from experiments.governed_strings.evidence import EvidenceError, EvidenceRecorder
-from experiments.governed_strings.primitives import Context, VALUE_TYPE
-from experiments.governed_strings.runtime import Assessment, Request
-from experiments.governed_strings.string import OperationDenied, TNString
-from experiments.governed_strings.numeric import TNNumeric
+from deepvest_tn.governed.evidence import EvidenceError, EvidenceRecorder
+from deepvest_tn.governed.primitives import Context, VALUE_TYPE
+from deepvest_tn.governed.runtime import Assessment, Request
+from deepvest_tn.governed.string import OperationDenied, TNString
+from deepvest_tn.governed.numeric import TNNumeric
 
 
 POLICY = """## experiment.primitive
@@ -179,7 +179,7 @@ def test_batch_refuses_mixed_types_or_unassigned_policy(context):
 @pytest.fixture
 def enrolled_batch_contexts(tmp_path):
     from contextlib import ExitStack
-    from experiments.governed_strings.provision import provision
+    from deepvest_tn.governed.provision import provision
 
     paths = provision(tmp_path / "sessions", roles=["gateway", "metadata_only"])
     primitive_policy = POLICY.split("## experiment.evidence", 1)[0]
@@ -212,7 +212,7 @@ def enrolled_batch_contexts(tmp_path):
 ])
 def test_metadata_reader_needs_real_values_key_for_compute_and_reveal(enrolled_batch_contexts, contents):
     from tn.governed import NotEntitled
-    from experiments.governed_strings.evidence import read_record
+    from deepvest_tn.governed.evidence import read_record
 
     gateway, receiver = (enrolled_batch_contexts[role] for role in ("gateway", "metadata_only"))
     sources = publish(gateway, contents)

@@ -101,12 +101,12 @@ def verify(root):
         for checkpoint in run["tapes"].values():
             require(checkpoint["writer"] in writers, "unrecognized recorder writer")
             files = sorted((root / checkpoint["path"]).glob("*.tn"))
-            require(len(files) == checkpoint["count"], "tape count differs from retained checkpoint")
+            require(len(files) == checkpoint["count"], "record count differs from retained checkpoint")
             tape = verify_tape([f.read_bytes() for f in files], session=session, policy=audit,
                 expected_writer=checkpoint["writer"], expected_context=checkpoint["context_id"],
                 expected_head=checkpoint["head"])
             for record in tape:
-                require(record.id not in by_id, "duplicate evidence record across tapes")
+                require(record.id not in by_id, "duplicate evidence record across record chains")
                 by_id[record.id] = record
                 records.append(record)
                 if record.body["kind"] != "Monitor":
@@ -313,7 +313,7 @@ def verify(root):
                    "native_lineage": native_lineage,
                    "verifier_source_sha256": {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
                                               for name in ("verify.py", "verify_model.py") if Path(__file__).with_name(name).exists()},
-                   "scope": "Native signatures/integrity; tape ordering; source assignments; discharged monitoring; claim and contract retention; native edition and lineage verification. No source primitive payload opened, and no assertion that a signature proves computation truth."}
+                   "scope": "Native signatures/integrity; record ordering; source assignments; discharged monitoring; claim and contract retention; native edition and lineage verification. No source primitive payload opened, and no assertion that a signature proves computation truth."}
         if run.get("model"):
             from .verify_model import verify_model
             summary["model"] = verify_model(root, run, records, by_id, rules, nodes, bindings_by_key,

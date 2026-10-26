@@ -685,11 +685,8 @@ impl Runtime {
     /// Absorb an ``admin_log_snapshot`` .tnpkg into the receiver's
     /// admin log.
     ///
-    /// Thin orchestrator: build receiver's local state, short-circuit
-    /// when the manifest is already dominated, parse the body, accept
-    /// each envelope through the per-line helper, append the
-    /// accepted set. Mirrors the Python ``_absorb_admin_log_snapshot``
-    /// decomposition (PR #40).
+    /// Build the receiver's local state and skip manifests already covered
+    /// by that state. Parse the body and append each accepted envelope.
     fn absorb_admin_log_snapshot(
         &self,
         manifest: &Manifest,

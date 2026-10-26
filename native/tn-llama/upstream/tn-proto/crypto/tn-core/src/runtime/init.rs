@@ -518,7 +518,7 @@ impl Runtime {
         }
 
         // Fresh ceremony: emit tn.ceremony.init as the first attested event.
-        // The reload path does not emit this (only fresh creation). See spec §2.1.
+        // Reloading a ceremony does not emit this event.
         //
         // `opts.skip_ceremony_init_emit` short-circuits the auto-emit even on a
         // fresh ceremony. SDK wrappers that bootstrap the ceremony from
@@ -654,7 +654,7 @@ impl Runtime {
         Ok(())
     }
 
-    /// Splice `tn.agents` policy fields into `fields` per spec §2.6.
+    /// Add `tn.agents` policy fields to `fields`.
     ///
     /// Looks up `event_type` in the cached policy doc; if a template
     /// exists, fills the six tn.agents fields via `setdefault` semantics

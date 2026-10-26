@@ -5,7 +5,7 @@ use tn_runtime::{
 
 fn fixture() -> (Value, GovernedInputConfig, RequestLimits) {
     let manifest: Value =
-        serde_json::from_str(include_str!("fixtures/governed/m1-manifest.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/governed/manifest.json")).unwrap();
     let config = serde_json::from_value(json!({
         "native_reader_config_path":"unused", "metadata_store_path":"unused",
         "use_context":manifest["uses"]["model"], "destinations":["internal-client"],
@@ -30,7 +30,7 @@ fn exact_wire_and_native_identity_survive_transport() {
         request["tn_object"].as_str().unwrap()
     );
     let manifest: Value =
-        serde_json::from_str(include_str!("fixtures/governed/m1-manifest.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/governed/manifest.json")).unwrap();
     assert_eq!(
         accepted.object.id(),
         manifest["publications"]["deepvest"]["object_id"]

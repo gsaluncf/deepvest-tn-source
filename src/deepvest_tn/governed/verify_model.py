@@ -111,7 +111,7 @@ def verify_model(root, run, records, by_id, rules, nodes, bindings, store, catal
     audit = [json.loads(line) for line in (root / "native-model/model-audit.ndjson").read_text().splitlines()]
     observations = {"record_kinds": [r["kind"] for r in audit],
                     "terminal_errors": [r["error_code"] for r in audit if r["kind"] == "terminal_error"],
-                    "assurance": "local process observations; this audit tape is not signed remote attestation"}
+                    "assurance": "local process observations; this execution log is not a signed remote attestation"}
     if not model["completed"]:
         require(not results and responses[0]["status"] != 200, "failed model run has success evidence")
         error = json.loads(base64.b64decode(responses[0]["body_b64"]))["error"]["code"]

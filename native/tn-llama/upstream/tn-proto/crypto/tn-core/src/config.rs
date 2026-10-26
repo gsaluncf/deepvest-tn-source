@@ -257,11 +257,8 @@ fn default_local() -> String {
     "local".into()
 }
 fn default_pel() -> String {
-    // Matches Python LoadedConfig.admin_log_location default
-    // (python/tn/config.py:263). Pre-2026-04-24 default was "main_log";
-    // changed when admin events got their own dedicated file alongside
-    // the main user log. Legacy yamls with `protocol_events_location: main_log`
-    // still keep that explicit value.
+    // Protocol events default to a dedicated file. An explicit
+    // `protocol_events_location: main_log` setting is retained.
     "./.tn/admin/admin.ndjson".into()
 }
 fn default_private() -> String {
@@ -557,8 +554,7 @@ fn non_empty_string(s: &str) -> Option<String> {
 
 /// Parse a tn.yaml document from a string.
 ///
-/// Enforces the reserved-namespace rule (per 2026-04-25 read-ergonomics
-/// spec §2.2): user-declared group names starting with `tn.` are rejected
+/// User-declared group names starting with `tn.` are rejected
 /// with [`Error::ReservedGroupName`] except for the protocol-injected
 /// `tn.agents` group.
 ///

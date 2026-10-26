@@ -62,14 +62,14 @@ try {
     }
 
     & $commandPath @(
-        "first-pass",
+        "portfolio-demo",
         "--run-directory", $RunDirectory,
         "--unity-url", $UnityUrl,
         "--feed-url", $FeedUrl,
         "--llama-port", [string]$LlamaPort
     )
     if ($LASTEXITCODE -ne 0) {
-        throw "deepvest-tn first-pass exited with code $LASTEXITCODE."
+        throw "deepvest-tn portfolio-demo exited with code $LASTEXITCODE."
     }
 } finally {
     foreach ($name in $containmentNames) {

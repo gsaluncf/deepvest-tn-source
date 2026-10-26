@@ -47,17 +47,16 @@ _LLAMA_LAUNCHER_PATH = _TN_LLAMA_ROOT / "scripts" / "llama" / "run-tn-server.ps1
 _ACCOUNT_ID = "acct-001"
 _GOVERNED_ROUTE = "/v1/tn/chat/completions"
 _STUB_DISCLOSURE = (
-    "DeepVest calculations in this first-pass report are deterministic stub outputs, "
+    "DeepVest calculations in this report are deterministic stub outputs, "
     "not live DeepVest results."
 )
 _FIXED_NARRATIVE_PARAGRAPH = (
-    "This first-pass report demonstrates governed transport of supplied portfolio positions "
-    "and provided DeepVest stub risk metrics without recalculation; it does not claim "
-    "data-specific narrative generation."
+    "This report contains supplied portfolio positions and DeepVest stub risk metrics. "
+    "The metrics and narrative are fixed."
 )
 _REPORT_PROMPT = (
-    "Use only the finance section. This plumbing-first profile does not ask the model to perform "
-    "a financial calculation or author data-specific analysis. Copy the following HTML exactly "
+    "Use only the finance section. Do not perform financial calculations or add "
+    "data-specific analysis. Copy the following HTML exactly "
     "into report_html:\n"
     "<html><head><title>Portfolio Report</title></head><body>\n"
     "<h1>Portfolio Report</h1>\n"
@@ -71,7 +70,7 @@ _CLEANUP_PORT_TIMEOUT_SECONDS = 5.0
 
 
 @dataclass(frozen=True, slots=True)
-class FirstPassConfig:
+class PortfolioDemoConfig:
     """User-selectable inputs for the fixed portfolio demonstration profile."""
 
     run_directory: Path
@@ -118,7 +117,7 @@ class GovernedServerSpec:
 
 
 @dataclass(frozen=True, slots=True)
-class FirstPassFacts:
+class PortfolioDemoFacts:
     """Non-secret boundary facts returned beside the verified release."""
 
     profile: str
@@ -132,13 +131,13 @@ class FirstPassFacts:
 
 
 @dataclass(frozen=True, slots=True)
-class FirstPassResult:
+class PortfolioDemoResult:
     """Verified report and factual artifacts from one portfolio demonstration execution."""
 
     release: ReportRelease
     report_path: Path
     summary_path: Path
-    facts: FirstPassFacts
+    facts: PortfolioDemoFacts
     witness_path: Path | None = None
 
 
@@ -436,7 +435,7 @@ def _validate_loopback_http_base_url(value: str, *, label: str) -> str:
     return value.rstrip("/")
 
 
-def _validate_first_pass_config(config: FirstPassConfig) -> tuple[Path, str, str]:
+def _validate_portfolio_demo_config(config: PortfolioDemoConfig) -> tuple[Path, str, str]:
     run_directory = _validate_new_run_directory(config.run_directory)
     if not config.api_key.strip():
         raise ValueError("TN_LLAMA_API_KEY must be nonempty")
@@ -460,7 +459,7 @@ def _validate_first_pass_config(config: FirstPassConfig) -> tuple[Path, str, str
     return run_directory, unity_url, feed_url
 
 
-def _provision_first_pass_tn(
+def _provision_portfolio_demo_tn(
     run_directory: Path,
     portfolio: GovernedPortfolioResult,
     execution,
@@ -581,7 +580,7 @@ def _summary_document(
     if output_event_type != "report.generated":
         raise ValueError("verified output event type is not report.generated")
     return {
-        "profile": "first_pass",
+        "profile": "portfolio_demo",
         "account_id": _ACCOUNT_ID,
         "unity": {
             "role": "governance_source",
@@ -811,7 +810,7 @@ def run_reference_path(
         [GovernedServerSpec], AbstractContextManager[None]
     ] = _governed_server,
     witness_writer: Callable[[Path], Path] = write_witness,
-) -> FirstPassResult:
+) -> PortfolioDemoResult:
     """Run the TN-object reference path through the governed tn-llama route."""
     run_directory, unity_url = _validate_reference_run_config(config)
     with _scoped_run_environment():
@@ -900,11 +899,11 @@ def run_reference_path(
                 ),
             )
         witness_path = witness_writer(run_directory)
-        return FirstPassResult(
+        return PortfolioDemoResult(
             release=release,
             report_path=report_path,
             summary_path=summary_path,
-            facts=FirstPassFacts(
+            facts=PortfolioDemoFacts(
                 profile="reference_path",
                 account_id=_ACCOUNT_ID,
                 feed_names=processing.polars.feed_names,
@@ -918,17 +917,17 @@ def run_reference_path(
         )
 
 
-def run_first_pass(
-    config: FirstPassConfig,
+def run_portfolio_demo(
+    config: PortfolioDemoConfig,
     *,
     server_lifecycle_factory: Callable[
         [GovernedServerSpec], AbstractContextManager[None]
     ] = _governed_server,
-) -> FirstPassResult:
+) -> PortfolioDemoResult:
     """Run the fixed Unity-to-recipient portfolio demonstration profile exactly once."""
-    run_directory, unity_url, feed_url = _validate_first_pass_config(config)
+    run_directory, unity_url, feed_url = _validate_portfolio_demo_config(config)
     with _scoped_run_environment():
-        return _run_first_pass_scoped(
+        return _run_portfolio_demo_scoped(
             config,
             run_directory=run_directory,
             unity_url=unity_url,
@@ -937,8 +936,8 @@ def run_first_pass(
         )
 
 
-def _run_first_pass_scoped(
-    config: FirstPassConfig,
+def _run_portfolio_demo_scoped(
+    config: PortfolioDemoConfig,
     *,
     run_directory: Path,
     unity_url: str,
@@ -946,7 +945,7 @@ def _run_first_pass_scoped(
     server_lifecycle_factory: Callable[
         [GovernedServerSpec], AbstractContextManager[None]
     ],
-) -> FirstPassResult:
+) -> PortfolioDemoResult:
     run_directory.mkdir(parents=True, exist_ok=False)
 
     portfolio = run_governed_polars_stage(
@@ -957,11 +956,11 @@ def _run_first_pass_scoped(
     stub = StubDeepVest()
     execution = execute_deepvest(stub, portfolio)
     if stub.invocations != (execution.request,):
-        raise RuntimeError("first-pass StubDeepVest did not execute exactly once")
+        raise RuntimeError("portfolio-demo StubDeepVest did not execute exactly once")
     if execution.result.provider != "stub" or execution.result.live is not False:
-        raise RuntimeError("first-pass DeepVest result is not explicitly stubbed")
+        raise RuntimeError("portfolio-demo DeepVest result is not explicitly stubbed")
 
-    flow = _provision_first_pass_tn(run_directory, portfolio, execution)
+    flow = _provision_portfolio_demo_tn(run_directory, portfolio, execution)
     runtime_directory = run_directory / "runtime"
     runtime_config_target = runtime_directory / "runtime-config.json"
     decision_events_path = runtime_directory / "decision-events.ndjson"
@@ -979,7 +978,7 @@ def _run_first_pass_scoped(
         raw_trace_dir=raw_trace_directory,
         model_path=_LLAMA_MODEL_PATH.resolve(),
         server_path=_GOVERNED_SERVER_PATH.resolve(),
-        build_id="deepvest-tn-first-pass",
+        build_id="deepvest-tn-portfolio-demo",
     )
     _preflight_loopback_port(config.llama_port)
     staged_build_target = run_directory / "execution" / "governed-build"
@@ -1051,12 +1050,12 @@ def _run_first_pass_scoped(
         )
         summary_path = _write_summary(run_directory / "run-summary.json", summary_document)
 
-    return FirstPassResult(
+    return PortfolioDemoResult(
         release=release,
         report_path=report_path,
         summary_path=summary_path,
-        facts=FirstPassFacts(
-            profile="first_pass",
+        facts=PortfolioDemoFacts(
+            profile="portfolio_demo",
             account_id=_ACCOUNT_ID,
             feed_names=portfolio.feed_names,
             stub_invocation_count=len(stub.invocations),
@@ -1066,3 +1065,10 @@ def _run_first_pass_scoped(
             recipient_open_groups=opened_groups,
         ),
     )
+
+
+# Public aliases for callers using the portfolio demonstration API.
+FirstPassConfig = PortfolioDemoConfig
+FirstPassFacts = PortfolioDemoFacts
+FirstPassResult = PortfolioDemoResult
+run_first_pass = run_portfolio_demo

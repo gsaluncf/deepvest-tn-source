@@ -6,11 +6,11 @@ import pytest
 import tn
 
 from deepvest_tn.publications import PublicationStore
-from experiments.governed_strings.evidence import EvidenceRecorder
-from experiments.governed_strings.metadata import describe
-from experiments.governed_strings.primitives import Context, SCHEMA, VALUE_TYPE
-from experiments.governed_strings.runtime import Assessment, Request
-from experiments.governed_strings.string import OperationDenied, ValueReference
+from deepvest_tn.governed.evidence import EvidenceRecorder
+from deepvest_tn.governed.metadata import describe
+from deepvest_tn.governed.primitives import Context, SCHEMA, VALUE_TYPE
+from deepvest_tn.governed.runtime import Assessment, Request
+from deepvest_tn.governed.string import OperationDenied, ValueReference
 from experiments.pvldb_evaluation.explicit import ExplicitOperations
 
 

@@ -620,9 +620,8 @@ impl FreshBtnCeremonyOptions {
 /// Used by [`Runtime::ephemeral`]. Lives in the public crate so
 /// downstream tests + benches don't have to duplicate it.
 ///
-/// Auto-injects the reserved `tn.agents` group per the 2026-04-25
-/// read-ergonomics spec §2.3. Pure-logging users pay nothing — the
-/// group's plaintext stays empty when no policy file exists.
+/// Adds the reserved `tn.agents` group. Its plaintext stays empty
+/// when no policy file exists.
 pub(crate) fn write_fresh_btn_ceremony(
     root: &Path,
     options: FreshBtnCeremonyOptions,

@@ -84,11 +84,11 @@ def verify_tape(wires, *, session, policy, expected_writer, expected_context, ex
         body = record.body
         if (body["context_id"] != expected_context or body["sequence"] != sequence
                 or body["previous"] != previous):
-            raise EvidenceError("evidence tape has a gap, reordering, or context substitution")
+            raise EvidenceError("signed record chain has a gap, reordering, or context substitution")
         records.append(record)
         previous = record.id
     if previous != expected_head:
-        raise EvidenceError("evidence tape does not reach the expected head")
+        raise EvidenceError("signed record chain does not reach the expected head")
     return tuple(records)
 
 

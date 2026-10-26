@@ -68,7 +68,7 @@ class StringMetadataProvider(Protocol):
         ...
 
     def python_hash(self, value: TNString) -> int:
-        """Equal hash to the same plaintext str in THIS Python process, not a wire digest."""
+        """Equal hash to the same plaintext str in this Python process, not a wire digest."""
         ...
 
     def fingerprint(self, value: TNString) -> str:

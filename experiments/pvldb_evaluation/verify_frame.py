@@ -20,11 +20,11 @@ import tn
 from tn_polars.opa import OpaWasmEvaluator
 
 from deepvest_tn.publications import open_publication_store, write_once
-from experiments.governed_strings.evidence import EvidenceError, verify_tape
-from experiments.governed_strings.primitives import SCHEMA, VALUE_TYPE
-from experiments.governed_strings.numeric_codec import decode, encode, record_value
-from experiments.governed_strings.metadata import describe
-from experiments.governed_strings.provision import POLICY
+from deepvest_tn.governed.evidence import EvidenceError, verify_tape
+from deepvest_tn.governed.primitives import SCHEMA, VALUE_TYPE
+from deepvest_tn.governed.numeric_codec import decode, encode, record_value
+from deepvest_tn.governed.metadata import describe
+from deepvest_tn.governed.provision import POLICY
 
 
 _STAGES = ("load", "filter", "sort", "with_columns", "select", "release")
@@ -170,7 +170,7 @@ def verify_frame(root):
                 expected_writer=checkpoint["writer"], expected_context=checkpoint["context_id"], expected_head=checkpoint["head"]))
         by_id = {}
         for record in records:
-            _require(record.id not in by_id, "duplicate evidence record across tapes")
+            _require(record.id not in by_id, "duplicate evidence record across record chains")
             by_id[record.id] = record
         frame_results = [record for record in records if record.body["kind"] == "Result"
                          and record.body["operation"] == "dataframe_calculate"]

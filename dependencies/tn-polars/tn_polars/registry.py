@@ -1,9 +1,9 @@
 """Unity Catalog as the registry: resolve a feed name to its governance bundle.
 
-A governed feed is a UC volume holding the compiled vendor reading, the TN
+A governed feed is a Unity Catalog volume holding the compiled policy, the TN
 governance body, the declared profile, and the OPA artifacts. A release is
 registered back as a UC external table over the governed Delta path, so the
-catalog knows both ends.
+catalog records both the source and output locations.
 """
 
 import json

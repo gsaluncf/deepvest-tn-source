@@ -1,4 +1,4 @@
-"""Behavioral probes for the experimental governed string boundary."""
+"""Governed string computation, disclosure, claims and signed records."""
 
 from dataclasses import replace
 
@@ -36,7 +36,8 @@ Refuse unverified evidence.
 
 @pytest.fixture
 def env(tmp_path):
-    from experiments.governed_strings import Context, EvidenceRecorder, Rules, publish_source
+    from deepvest_tn.governed import EvidenceRecorder, Rules, publish_source
+    from deepvest_tn.governed.runtime import Context
 
     with tn.Session(POLICY, groups=["strings", "evidence"]) as session:
         store = PublicationStore(tmp_path / "publications")
@@ -53,7 +54,7 @@ def env(tmp_path):
 
 
 def records(context):
-    from experiments.governed_strings import verify_tape
+    from deepvest_tn.governed import verify_tape
 
     return verify_tape(
         context.recorder.records(), session=context.session,
@@ -64,7 +65,7 @@ def records(context):
 
 
 def test_compute_can_succeed_when_exposure_is_refused(env):
-    from experiments.governed_strings import OperationDenied, TNString
+    from deepvest_tn.governed import OperationDenied, TNString
 
     context, values, rules = env
     context.evaluator = replace(rules, destinations=frozenset())
@@ -85,7 +86,7 @@ def test_compute_can_succeed_when_exposure_is_refused(env):
 
 
 def test_denial_and_failed_obligation_never_open_business_data(env, monkeypatch):
-    from experiments.governed_strings import Assessment, ObligationResult, OperationDenied
+    from deepvest_tn.governed import Assessment, ObligationResult, OperationDenied
 
     context, values, _ = env
     opened = []
@@ -104,7 +105,7 @@ def test_denial_and_failed_obligation_never_open_business_data(env, monkeypatch)
 
 
 def test_obligation_completes_and_decision_is_durable_before_open(env, monkeypatch):
-    from experiments.governed_strings import Assessment, ObligationResult
+    from deepvest_tn.governed import Assessment, ObligationResult
 
     context, values, _ = env
     order = []
@@ -127,7 +128,7 @@ def test_obligation_completes_and_decision_is_durable_before_open(env, monkeypat
     assert order == ["monitor", "open"]
 
 
-def test_claims_follow_concat_without_becoming_binding(env):
+def test_concat_preserves_claim_issuer_and_original_subjects(env):
     context, values, _ = env
     with context:
         claimed = values["name"].attest("This name is suitable for display.", context)
@@ -146,21 +147,29 @@ def test_claims_follow_concat_without_becoming_binding(env):
     assert governance.matches_contract(context.session.policy("experiment.string"))
 
 
-def test_copy_preserves_identity_and_gated_str_uses_destination(env):
-    from experiments.governed_strings import OperationDenied
+def test_copy_records_its_source_and_gated_str_uses_destination(env):
+    from deepvest_tn.governed import OperationDenied
 
     context, values, _ = env
     with pytest.raises(OperationDenied):
         str(values["name"])
     with context:
         copied = values["name"].copy()
-        assert copied.reference == values["name"].reference
+        assert copied.reference.object_id != values["name"].reference.object_id
+        assert copied.reference.field == values["name"].reference.field
+        copy_result = next(record for record in records(context) if record.id == copied.result_id)
+        assert copy_result.body["kind"] == "Result"
+        assert copy_result.body["operation"] == "copy"
+        assert copy_result.body["inputs"] == [values["name"].reference.to_dict()]
+        assert copy_result.body["details"]["output"] == copied.reference.to_dict()
+        context.inspect(copied)
         with pytest.raises(OperationDenied):
             str(copied)
         with context.exposure("support-console"):
             assert str(copied) == "Ada"
-    assert "Carry" in [r.body["kind"] for r in records(context)]
-    assert records(context)[-1].body["kind"] == "Disclosure"
+    assert [record.body["kind"] for record in records(context)] == [
+        "Decision", "Result", "Decision", "Refusal", "Decision", "Disclosure",
+    ]
 
 
 def test_recording_failure_never_returns_plaintext_or_runs_compute(env, monkeypatch):
@@ -177,8 +186,8 @@ def test_recording_failure_never_returns_plaintext_or_runs_compute(env, monkeypa
     assert opened == []
 
 
-def test_tape_rejects_tampering_truncation_and_wrong_writer(env):
-    from experiments.governed_strings import EvidenceError, verify_tape
+def test_record_chain_rejects_tampering_truncation_and_wrong_writer(env):
+    from deepvest_tn.governed import EvidenceError, verify_tape
 
     context, values, _ = env
     with context:
@@ -205,13 +214,14 @@ def test_tape_rejects_tampering_truncation_and_wrong_writer(env):
 
 
 def test_forged_result_citation_and_invalid_outcomes_are_refused(env):
-    from experiments.governed_strings import EvidenceError, OperationDenied
+    from deepvest_tn.governed import EvidenceError, OperationDenied, TNString
 
     context, values, _ = env
     with context:
         upper = values["name"].upper()
         other = values["value"].lower()
-        forged = replace(upper, result_id=other.result_id)
+        forged = TNString(upper.reference, upper.decision_id, other.result_id,
+                          metadata_provider=upper.metadata_provider)
         with pytest.raises(EvidenceError):
             context.inspect(forged)
         context.evaluator = lambda request: "not refused"

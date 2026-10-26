@@ -129,7 +129,7 @@ def encrypted_release_body(governed_flow: TNFlowResult) -> bytes:
         aad={"governed_by": writer.cfg.device.device_identity, "policy": policy_reference},
         default={
             "report_html": (
-                "<p>DeepVest calculations in this first-pass report are deterministic "
+                "<p>DeepVest calculations in this report are deterministic "
                 "stub outputs, not live DeepVest results.</p>"
             )
         },
@@ -480,7 +480,7 @@ def test_runtime_config_is_the_closed_finance_profile_with_live_material(
         raw_trace_dir=raw_trace_dir,
         model_path=model_path.resolve(),
         server_path=server_path.resolve(),
-        build_id="deepvest-tn-first-pass",
+        build_id="deepvest-tn-portfolio-demo",
     )
 
     assert written == config_path
@@ -499,7 +499,7 @@ def test_runtime_config_is_the_closed_finance_profile_with_live_material(
                 "finance": {
                     "propagate_source_governance": True,
                     "required_attribution": (
-                        "DeepVest calculations in this first-pass report are deterministic "
+                        "DeepVest calculations in this report are deterministic "
                         "stub outputs, not live DeepVest results."
                     ),
                     "required_tool": None,
@@ -528,7 +528,7 @@ def test_runtime_config_is_the_closed_finance_profile_with_live_material(
         "output_index_epoch": 0,
         "audit_path": str(audit_path),
         "raw_trace_dir": str(raw_trace_dir),
-        "build_id": "deepvest-tn-first-pass",
+        "build_id": "deepvest-tn-portfolio-demo",
         "llama_source_revision": "3f545beccee69d9975f466ec7e45fd9aacd8ba90",
         "model_sha256": "2cbdd631a15e89b1e57204890d9515dc9091da693880f9cde3b32e7bd0f04597",
         "binary_sha256": "537227e448ebb9a8c0274f14f180f77a3a37e02b6343ce9ca9a03787c36fc8e0",
@@ -903,7 +903,7 @@ def test_submit_uses_only_the_governed_route_and_returns_verified_release(
 
     assert isinstance(release, ReportRelease)
     assert release.report_html == (
-        "<p>DeepVest calculations in this first-pass report are deterministic "
+        "<p>DeepVest calculations in this report are deterministic "
         "stub outputs, not live DeepVest results.</p>"
     )
     assert len(requests) == 1
@@ -1105,7 +1105,7 @@ print(json.dumps({
     assert opened["output_event_id"] == wrapper["output_event_id"]
     assert opened["output_row_hash"] == wrapper["output_row_hash"]
     assert opened["report_html"] == (
-        "<p>DeepVest calculations in this first-pass report are deterministic "
+        "<p>DeepVest calculations in this report are deterministic "
         "stub outputs, not live DeepVest results.</p>"
     )
     assert received_path.read_text(encoding="utf-8") == wrapper["output_ndjson"]

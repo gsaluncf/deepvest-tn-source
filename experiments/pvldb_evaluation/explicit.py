@@ -34,9 +34,9 @@ model/report workflow.
 
 from uuid import uuid4
 
-from experiments.governed_strings.numeric import TNNumeric
-from experiments.governed_strings.numeric_codec import NUMERIC_TYPES
-from experiments.governed_strings.string import OperationDenied, TNString, _active
+from deepvest_tn.governed.numeric import TNNumeric
+from deepvest_tn.governed.numeric_codec import NUMERIC_TYPES
+from deepvest_tn.governed.string import OperationDenied, TNString, _active
 
 
 class ExplicitOperations:

@@ -24,17 +24,18 @@ import tn
 import tn_llama_client
 import tn_polars
 
+import deepvest_tn.governed as governed
 from deepvest_tn.native_run import governed_server, wsl_path
 from deepvest_tn.publications import open_publication_store, write_once
-from experiments.governed_strings.bloomberg_demo import (
+from deepvest_tn.governed.market_report import (
     APPLICATION, MODEL_USE, NOTICE, PURPOSE, RECIPIENT_USE, REVIEW_ACTION, policy,
 )
-from experiments.governed_strings.catalog import AssignedRules
-from experiments.governed_strings.demo import handle
-from experiments.governed_strings.evidence import EvidenceRecorder
-from experiments.governed_strings.model import NativeModelEndpoint, digest, prepare_native_model
-from experiments.governed_strings.provision import provision
-from experiments.governed_strings.sql import GovernedSQL, source_identity
+from deepvest_tn.governed.catalog import AssignedRules
+from deepvest_tn.governed.demo import handle
+from deepvest_tn.governed.evidence import EvidenceRecorder
+from deepvest_tn.governed.model import NativeModelEndpoint, digest, prepare_native_model
+from deepvest_tn.governed.provision import provision
+from deepvest_tn.governed.sql import GovernedSQL, source_identity
 from .frames import DataframeContext, DataframeGovernance, dataframe_calculate
 from .metrics import stage as profile_stage
 
@@ -173,7 +174,7 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
         if model and (not binary.is_file() or not model_path.is_file()):
             raise FileNotFoundError("configured native model binary or GGUF is missing")
         if mode == "explicit":
-            from .explicit import ExplicitOperations  # Check the comparison adapter before provisioning.
+            from .explicit import ExplicitOperations  # noqa: F401 - Validate the adapter before provisioning.
 
         stage = "setup"
         with _timed(timings, stage):
@@ -296,8 +297,14 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
                 handoffs = [r for r in records if r.body["kind"] == "ModelHandoff"]
                 tapes = {role: {**ctx.recorder.export(root / "tapes" / role), "path": "tapes/" + role}
                          for role, ctx in contexts.items()}
-                source_files = [*Path(__file__).parent.glob("*.py"),
-                                *(repository / "experiments/governed_strings").glob("*.py")]
+                source_hashes = {
+                    "experiments/pvldb_evaluation/" + path.name: digest(path)
+                    for path in sorted(Path(__file__).parent.glob("*.py"))
+                }
+                source_hashes.update({
+                    "deepvest_tn/governed/" + path.name: digest(path)
+                    for path in sorted(Path(governed.__file__).parent.glob("*.py"))
+                })
                 commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repository,
                                         text=True, capture_output=True, check=True).stdout.strip()
                 manifest = {
@@ -325,8 +332,7 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
                         "uv_lock_sha256": digest(repository / "uv.lock"),
                         "pyproject_sha256": digest(repository / "pyproject.toml"),
                         "adapter_source_sha256": _adapter_sources(repository),
-                        "experiment_source_sha256": {p.relative_to(repository).as_posix(): digest(p)
-                                                     for p in sorted(source_files)}},
+                        "experiment_source_sha256": source_hashes},
                     "evaluation": {"mode": mode, "rows": rows, "depth": depth, "branches": branches,
                                    "publication_storage": storage,
                                    "claim": bool(claim), "requested_model": bool(model),
@@ -353,7 +359,7 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
                     }
                 write_once(root / "run.json", json.dumps(manifest, indent=2).encode())
         stage = "verification"
-        from experiments.governed_strings.verify import verify
+        from deepvest_tn.governed.verify import verify
         from .verify_frame import verify_frame
         try:
             with _timed(timings, stage):

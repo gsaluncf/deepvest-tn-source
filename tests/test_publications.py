@@ -188,7 +188,7 @@ def test_native_read_preserves_wire_and_requires_a_new_use_decision(governed_sto
 
 
 def test_record_read_rechecks_authority_after_loading_the_native_object(governed_store):
-    from experiments.governed_strings.evidence import EvidenceError, EvidenceRecorder, read_record
+    from deepvest_tn.governed.evidence import EvidenceError, EvidenceRecorder, read_record
 
     other_policy = POLICY.replace("portfolio.feed.data.v1", "another.policy")
     with tn.Session(POLICY + "\n" + other_policy, groups=["evidence"]) as session:
@@ -207,7 +207,7 @@ def test_record_read_rechecks_authority_after_loading_the_native_object(governed
 
 def test_string_operations_preserve_claims_and_recheck_permission(governed_store, monkeypatch):
     from uuid import uuid4
-    from experiments.governed_strings import (
+    from deepvest_tn.governed import (
         Assessment, Context, EvidenceRecorder, OperationDenied, Request, TNString,
     )
 

@@ -141,8 +141,7 @@ pub enum Error {
 
     /// User yaml declared a group whose name starts with `tn.` other than
     /// the auto-injected `tn.agents`. The `tn.*` namespace is reserved
-    /// for protocol-level conventions per the 2026-04-25 read-ergonomics
-    /// spec §2.2.
+    /// for protocol-level conventions.
     #[error("group name {name:?} is reserved (the `tn.*` namespace is for protocol-level conventions; only `tn.agents` is allowed). Rename your group.")]
     ReservedGroupName {
         /// The offending group name.

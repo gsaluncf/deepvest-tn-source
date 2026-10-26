@@ -36,10 +36,12 @@ def handle(value):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--unity-url", default="http://127.0.0.1:8080")
+    parser.add_argument("--project-directory", type=Path, default=Path.cwd(),
+                        help="Project containing config/sdk-build.json and the pinned dependencies")
     parser.add_argument("--run-directory", type=Path)
     parser.add_argument("--numeric-type", choices=["int", "float", "Decimal"], default="int")
     args = parser.parse_args()
-    repository = Path(__file__).resolve().parents[2]
+    repository = args.project_directory.resolve()
     sdk_record = repository / "config/sdk-build.json"
     sdk = json.loads(sdk_record.read_text())
     native_module = Path(tn.__file__).parent / "_native.pyd"
@@ -48,7 +50,7 @@ def main():
     if version != sdk["version"] or native_digest != sdk["install"]["native_module_sha256"]:
         raise RuntimeError("the installed TN runtime does not match this repository's pinned build")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid4().hex[:6]
-    root = (args.run_directory or Path("experiments/results") / ("governed-primitives-" + stamp)).resolve()
+    root = (args.run_directory or repository / "experiments/results" / ("governed-primitives-" + stamp)).resolve()
     root.mkdir(parents=True, exist_ok=False)
     print(f"Run artifacts: {root}", flush=True)
     database = root / "example.sqlite"
@@ -158,7 +160,7 @@ def main():
             tapes[label_] = {**ctx.recorder.export(root / "tapes" / label_),
                              "path": "tapes/" + label_}
         objects = {"report": handle(report), "total": handle(total), "copy": handle(copied)}
-        source_hashes = {p.relative_to(repository).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        source_hashes = {"deepvest_tn/governed/" + p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                          for p in sorted(Path(__file__).parent.glob("*.py"))}
         manifest = {
             "schema": "tn.primitive-run.v1", "created_utc": stamp,
@@ -185,7 +187,7 @@ def main():
                         "repository_commit": subprocess.run(["git", "rev-parse", "HEAD"], cwd=repository,
                             check=True, text=True, capture_output=True).stdout.strip(),
                         "experiment_source_sha256": source_hashes},
-            "trust_note": "Keep this manifest's endpoint identities and tape heads independently. It is an index, not a self-authenticating trust root.",
+            "trust_note": "Keep this manifest's endpoint identities and record-chain heads independently. It is an index, not a self-authenticating trust root.",
         }
         write_once(root / "run.json", json.dumps(record_value(manifest), indent=2).encode())
     print(f"Evidence ready for an independent, offline recipient: {root / 'run.json'}", flush=True)

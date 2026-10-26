@@ -1,4 +1,4 @@
-//! Tests for `Runtime::admin_add_agent_runtime` (per spec §2.8).
+//! Tests for `Runtime::admin_add_agent_runtime`.
 
 #![cfg(feature = "fs")]
 

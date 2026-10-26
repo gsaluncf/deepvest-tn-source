@@ -11,15 +11,15 @@ import tn
 from tn.governed import GovernedError
 
 from deepvest_tn.publications import PublicationStore
-from experiments.governed_strings.catalog import AssignedRules, UnityGovernance, markdown
-from experiments.governed_strings.evidence import EvidenceError, EvidenceRecorder, Record
-from experiments.governed_strings.metadata import describe
-from experiments.governed_strings.primitives import Context, SCHEMA, VALUE_TYPE
-from experiments.governed_strings.provision import provision
-from experiments.governed_strings.runtime import Request
-from experiments.governed_strings.sql import source_identity
-from experiments.governed_strings.string import TNString, ValueReference
-from experiments.governed_strings.verify import verify
+from deepvest_tn.governed.catalog import AssignedRules, UnityGovernance, markdown
+from deepvest_tn.governed.evidence import EvidenceError, EvidenceRecorder, Record
+from deepvest_tn.governed.metadata import describe
+from deepvest_tn.governed.primitives import Context, SCHEMA, VALUE_TYPE
+from deepvest_tn.governed.provision import provision
+from deepvest_tn.governed.runtime import Request
+from deepvest_tn.governed.sql import source_identity
+from deepvest_tn.governed.string import TNString, ValueReference
+from deepvest_tn.governed.verify import verify
 
 
 @pytest.fixture
@@ -143,7 +143,7 @@ def test_source_batch_requires_exactly_one_signed_sql_read(batch_run):
 
 @pytest.mark.parametrize("batch_run", [{"rows": 64}], indirect=True)
 def test_record_selection_work_is_linear_in_batch_size(batch_run, monkeypatch):
-    from experiments.governed_strings import verify as module
+    from deepvest_tn.governed import verify as module
 
     root, _ = batch_run
     original = module.verify_tape
@@ -218,7 +218,7 @@ def test_shared_publication_is_read_and_opened_once_per_verification(batch_run, 
 
 @pytest.mark.parametrize("fail", [False, True])
 def test_verification_cache_is_bounded_and_cleared_on_exit(batch_run, monkeypatch, fail):
-    from experiments.governed_strings import verify as module
+    from deepvest_tn.governed import verify as module
     root, run = batch_run
     caches = []
 

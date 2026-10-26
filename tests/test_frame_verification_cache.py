@@ -12,7 +12,7 @@ import tn
 from tn.governed import GovernedError
 
 from deepvest_tn.sqlite_publications import SQLitePublicationStore
-from experiments.governed_strings.evidence import EvidenceError
+from deepvest_tn.governed.evidence import EvidenceError
 from experiments.pvldb_evaluation import verify_frame as module
 from experiments.pvldb_evaluation.run import run_case
 from tn_polars.registry import UnityCatalogRegistry
@@ -173,7 +173,7 @@ def test_next_verification_rechecks_changed_inputs(saved_frame, observation, cha
         assert observation.receives[source] == 1
 
 
-def test_duplicate_records_across_tapes_are_rejected(saved_frame, observation):
+def test_duplicate_records_across_chains_are_rejected(saved_frame, observation):
     root, run = saved_frame
     checkpoint = next(iter(run["tapes"].values()))
     run["tapes"]["duplicate"] = dict(checkpoint)

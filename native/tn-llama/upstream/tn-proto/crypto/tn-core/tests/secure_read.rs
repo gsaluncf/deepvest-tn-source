@@ -1,4 +1,4 @@
-//! Tests for `Runtime::secure_read` (per 2026-04-25 read-ergonomics spec §3).
+//! Tests for `Runtime::secure_read`.
 
 #![cfg(feature = "fs")]
 

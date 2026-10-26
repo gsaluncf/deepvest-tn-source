@@ -23,7 +23,7 @@ _GOVERNANCE_GROUP = "tn.agents"
 _OUTPUT_EVENT_TYPE = "report.generated"
 _LLAMA_SOURCE_REVISION = "3f545beccee69d9975f466ec7e45fd9aacd8ba90"
 _STUB_ATTRIBUTION = (
-    "DeepVest calculations in this first-pass report are deterministic stub outputs, "
+    "DeepVest calculations in this report are deterministic stub outputs, "
     "not live DeepVest results."
 )
 _POLICY_FIELDS = (

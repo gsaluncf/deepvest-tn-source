@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from experiments.governed_strings.sql import GovernedSQL, source_identity
+from deepvest_tn.governed.sql import GovernedSQL, source_identity
 
 
 def test_source_identity_streams_the_snapshot(tmp_path, monkeypatch):

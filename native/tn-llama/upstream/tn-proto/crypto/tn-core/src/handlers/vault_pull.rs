@@ -39,7 +39,7 @@ pub struct VaultInboxItem {
     /// Receive timestamp (wall-clock; fallback for cursor advance when
     /// `since_marker` is absent).
     pub received_at: Option<String>,
-    /// Server-supplied opaque, order-preserving cursor (per spec §4.1).
+    /// Server-supplied opaque, order-preserving cursor.
     /// When present, the handler advances `?since=...` by this value
     /// rather than `received_at`. Falls back to `received_at` for
     /// vault implementations that don't emit `since_marker` yet.
@@ -275,7 +275,7 @@ impl VaultPullHandler {
                         continue;
                     }
                     absorbed += 1;
-                    // Per spec §4.1: prefer server-supplied since_marker
+                    // Prefer the server-supplied since_marker
                     // (opaque, order-preserving). Fall back to received_at
                     // for vault implementations that don't emit since_marker.
                     let cursor_value = item.since_marker.as_deref().or(item.received_at.as_deref());

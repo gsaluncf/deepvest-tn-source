@@ -9,9 +9,9 @@ import pytest
 import tn
 
 from deepvest_tn.publications import PublicationStore
-from experiments.governed_strings.catalog import SignedMetadataCache, UnityGovernance
-from experiments.governed_strings.provision import provision
-from experiments.governed_strings.string import OperationDenied
+from deepvest_tn.governed.catalog import SignedMetadataCache, UnityGovernance
+from deepvest_tn.governed.provision import provision
+from deepvest_tn.governed.string import OperationDenied
 
 
 class CatalogTransport:
@@ -216,7 +216,7 @@ def test_consumer_rejects_previously_accepted_packet_when_its_metadata_authority
 
 
 def test_concurrent_integrity_cache_misses_do_not_double_count_retained_wire(setup, monkeypatch):
-    from experiments.governed_strings import catalog as module
+    from deepvest_tn.governed import catalog as module
 
     wire = packet_wires(setup)[0]
     native_read = tn.GovernedObject.read

@@ -88,7 +88,7 @@ def test_record_batch_is_atomic_and_immutable(tmp_path):
 
 
 def test_failed_record_commit_does_not_advance_recorder_or_allow_computation(tmp_path, monkeypatch):
-    from experiments.governed_strings import Assessment, Context, EvidenceRecorder, Request
+    from deepvest_tn.governed import Assessment, Context, EvidenceRecorder, Request
 
     with SQLitePublicationStore(tmp_path) as store, tn.Session(POLICY, groups=["values", "evidence"]) as session:
         policy = session.policy("portfolio.feed.data.v1")

@@ -52,18 +52,20 @@ The review requirement has a different effect in this example: the receiving ser
 
 ## Source Guide
 
+The installed `deepvest_tn.governed` package provides `TNString`, `TNNumeric`, `Context`, and `GovernedSQL`. Application adapters are in `deepvest_tn`; the paper's workload drivers are in `experiments/pvldb_evaluation`.
+
 | Source | What to read |
 | --- | --- |
-| [numeric.py](experiments/governed_strings/numeric.py) | Numeric operators and preservation of the underlying Python numeric type |
-| [string.py](experiments/governed_strings/string.py) | Governed string methods, slicing, concatenation and exposure |
-| [primitives.py](experiments/governed_strings/primitives.py) | Authorization, opening values and publishing derived values |
-| [sql.py](experiments/governed_strings/sql.py) | Resolving source governance and returning governed SQL cells |
+| [numeric.py](src/deepvest_tn/governed/numeric.py) | Numeric operators and preservation of the underlying Python numeric type |
+| [string.py](src/deepvest_tn/governed/string.py) | Governed string methods, slicing, concatenation and exposure |
+| [primitives.py](src/deepvest_tn/governed/primitives.py) | Authorization, opening values and publishing derived values |
+| [sql.py](src/deepvest_tn/governed/sql.py) | Resolving source governance and returning governed SQL cells |
 | [frames.py](experiments/pvldb_evaluation/frames.py) | SQL cells through governed Polars and back to a governed number |
 | [numeric_profile.py](experiments/pvldb_evaluation/numeric_profile.py) | Exact dataframe types and range checks |
 | [Native server](native/tn-llama) | Rust governance runtime, TN cryptography, C++ integration and pinned llama.cpp patch |
-| [model.py](experiments/governed_strings/model.py) | Native transfer to the model service and registration of pending review |
+| [model.py](src/deepvest_tn/governed/model.py) | Native transfer to the model service and registration of pending review |
 | [run.py](experiments/pvldb_evaluation/run.py) | Complete setup, execution and verification of the submission example |
-| [evidence.py](experiments/governed_strings/evidence.py) | Signed records of each context's operations |
+| [evidence.py](src/deepvest_tn/governed/evidence.py) | Signed records of each context's operations |
 
 `TNString` subclasses `str`, with a locator in the inherited string buffer. Its protected content is in the TN publication. `TNNumeric` refers to an encrypted number. It preserves `int`, `float`, and `Decimal` behavior by applying operations to the underlying values inside the authorized runtime. Scalar complex results are also supported. The SQL/dataframe example supports integers, floats and decimals.
 
@@ -187,7 +189,7 @@ The installer prints the container name and URL. Stop it with
 This command uses native encryption and signatures without a Unity or model connection:
 
 ```powershell
-python -m experiments.governed_strings.verify_numeric --run-directory experiments/results/numeric-check
+python -m deepvest_tn.governed.verify_numeric --run-directory experiments/results/numeric-check
 ```
 
 It checks numeric round trips, arithmetic, type promotion, Decimal precision, equality and hashing, multiple-result operations, references to contributing inputs, claim attribution, authorization, decryption capability and signed records. It writes `numeric-verification.json` and the publications used for verification.
@@ -391,6 +393,6 @@ python -m experiments.pvldb_evaluation.verify_numeric_path --run-directory exper
 For the smaller SQL/string/numeric demonstration:
 
 ```powershell
-python -m experiments.governed_strings.demo --numeric-type Decimal --run-directory experiments/results/sql-primitives
-python -m experiments.governed_strings.verify experiments/results/sql-primitives
+python -m deepvest_tn.governed.demo --numeric-type Decimal --run-directory experiments/results/sql-primitives
+python -m deepvest_tn.governed.verify experiments/results/sql-primitives
 ```
