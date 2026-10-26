@@ -4,7 +4,7 @@ import pytest
 import tn
 import wasmtime
 
-from deepvest_tn.unity import resolve_finance_editions
+from tn_governed.unity import resolve_finance_editions
 from governed_edition_fixtures import signed_edition
 from test_unity_editions import register, request, trust
 from tn_polars import opa

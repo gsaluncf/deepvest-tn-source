@@ -19,10 +19,10 @@ import yaml
 from tn.identity import Identity
 from tn_polars.tn_envelopes import DeskLedger
 
-from deepvest_tn.deepvest import DeepVestExecution, StubDeepVest, execute_deepvest
-from deepvest_tn.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
-from deepvest_tn.polars_stage import GovernedPortfolioResult, run_governed_polars_stage
-from deepvest_tn.tn_flow import (
+from tn_governed.calculation import PortfolioExecution, StubCalculationPort, execute_portfolio_calculation
+from tn_governed.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
+from tn_governed.polars_stage import GovernedPortfolioResult, run_governed_polars_stage
+from tn_governed.tn_flow import (
     ModelBoundTNRow,
     OutputWriterMaterial,
     RuntimeReaderMaterial,
@@ -33,7 +33,7 @@ from deepvest_tn.tn_flow import (
     provision_tn_flow,
     validate_runtime_reader_material,
 )
-from deepvest_tn.unity import UnityCatalogConfig, build_finance_feed_bundles
+from tn_governed.unity import UnityCatalogConfig, build_finance_feed_bundles
 
 FIXTURE_ROOT = Path("fixtures/portfolio")
 POSITIONS_PATH = FIXTURE_ROOT / "internal_positions.ndjson"
@@ -119,12 +119,12 @@ def tn_flow(tmp_path: Path, governed_portfolio: GovernedPortfolioResult) -> TNFl
 def _provision(
     root: Path,
     governed_portfolio: GovernedPortfolioResult,
-    execution: DeepVestExecution | None = None,
+    execution: PortfolioExecution | None = None,
     *,
     alias_output_recipient: bool = False,
 ) -> TNFlowResult:
     if execution is None:
-        execution = execute_deepvest(StubDeepVest(), governed_portfolio)
+        execution = execute_portfolio_calculation(StubCalculationPort(), governed_portfolio)
     return provision_tn_flow(
         governed_portfolio,
         execution,
@@ -228,7 +228,7 @@ def test_canonical_source_row_round_trips_exact_values_and_governance(
     assert json.loads(row.raw_ndjson) == dict(row.envelope)
     assert row.event_id == row.envelope["event_id"]
     assert row.row_hash == row.envelope["row_hash"]
-    assert row.envelope["event_type"] == "portfolio.deepvest.calculated"
+    assert row.envelope["event_type"] == "portfolio.calculation.calculated"
     assert row.envelope["level"] == "info"
     assert row.encrypted_groups == ("finance", "tn.agents")
     assert b"acct-001" not in row.raw_ndjson
@@ -295,8 +295,8 @@ def test_canonical_source_row_round_trips_exact_values_and_governance(
             },
         ],
         "native_feed_names": [
-            "deepvest.internal.positions",
-            "deepvest.market.prices",
+            "portfolio.internal.positions",
+            "portfolio.market.prices",
         ],
         "native_column_sources": {
             "account_id": ["account_id"],
@@ -329,7 +329,7 @@ def test_canonical_source_row_round_trips_exact_values_and_governance(
             "policy": row.policy_reference,
         },
     }
-    assert finance["plaintext"]["finance"]["deepvest_result"] == {
+    assert finance["plaintext"]["finance"]["calculation_result"] == {
         "calculation_id": "stub-portfolio-risk-001",
         "analysis_type": "portfolio_risk",
         "metrics": [
@@ -346,7 +346,7 @@ def test_canonical_source_row_round_trips_exact_values_and_governance(
             "analysis and report row."
         ),
         "use_for": (
-            "Internal portfolio analysis and reporting for the authorized DeepVest workflow."
+            "Internal portfolio analysis and reporting for the authorized portfolio workflow."
         ),
         "do_not_use_for": (
             "Trade execution, investment order placement, or external redistribution of "
@@ -364,7 +364,7 @@ def test_canonical_source_row_round_trips_exact_values_and_governance(
     _source_writer = tn.init(source_config, link=False, stdout=False)
     source_policy = tn.agents.policy()
     assert source_policy is not None
-    template = source_policy.templates["portfolio.deepvest.calculated"]
+    template = source_policy.templates["portfolio.calculation.calculated"]
     parsed_reference = (
         f"{template.path}#{template.event_type}@{template.version}#"
         f"{template.content_hash}"
@@ -539,7 +539,7 @@ def test_source_profile_validator_rejects_load_bearing_config_mutations(
     config_path = tn_flow.source_row.source_log_path.parent.parent / "tn.yaml"
     document = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     if mutation == "cross_route":
-        document["groups"]["tn.agents"]["fields"].append("deepvest_result")
+        document["groups"]["tn.agents"]["fields"].append("calculation_result")
     elif mutation == "public_policy":
         document["groups"]["finance"]["policy"] = "public"
     else:
@@ -920,7 +920,7 @@ def test_official_reader_marks_wire_mutations_invalid(
         assert opened[0]["plaintext"]["finance"] == {"$no_read_key": True}
         plaintext_text = json.dumps(opened[0]["plaintext"], sort_keys=True)
         assert "portfolio_values" not in plaintext_text
-        assert "deepvest_result" not in plaintext_text
+        assert "calculation_result" not in plaintext_text
 
 
 def test_unrouted_automatic_run_id_fails_source_profile_before_package(
@@ -1042,17 +1042,17 @@ def test_tn_flow_consumes_prepared_values_without_recalling_sibling_boundaries(
     governed_portfolio: GovernedPortfolioResult,
     monkeypatch,
 ) -> None:
-    execution = execute_deepvest(StubDeepVest(), governed_portfolio)
+    execution = execute_portfolio_calculation(StubCalculationPort(), governed_portfolio)
 
     def forbidden(*_args, **_kwargs):
         raise AssertionError("Governed execution recalled a forbidden sibling or network boundary")
 
     monkeypatch.setattr(
-        "deepvest_tn.polars_stage.run_governed_polars_stage",
+        "tn_governed.polars_stage.run_governed_polars_stage",
         forbidden,
     )
-    monkeypatch.setattr("deepvest_tn.deepvest.execute_deepvest", forbidden)
-    monkeypatch.setattr(StubDeepVest, "calculate", forbidden)
+    monkeypatch.setattr("tn_governed.calculation.execute_portfolio_calculation", forbidden)
+    monkeypatch.setattr(StubCalculationPort, "calculate", forbidden)
     monkeypatch.setattr("tn_polars.registry.UnityCatalogRegistry._request", forbidden)
     monkeypatch.setattr(socket, "create_connection", forbidden)
 

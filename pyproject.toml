@@ -3,9 +3,9 @@ requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
-name = "deepvest-tn"
+name = "tn-governed"
 version = "0.1.0"
-description = "Governed data processing through SQL, Polars, DeepVest, and language models"
+description = "Governed data processing through SQL, Polars, calculations, and language models"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "polars==1.39.3",
@@ -28,7 +28,7 @@ dev = [
 ]
 
 [project.scripts]
-deepvest-tn = "deepvest_tn.cli:main"
+tn-governed = "tn_governed.cli:main"
 
 [tool.uv.sources]
 tn-polars = { path = "dependencies/tn-polars", editable = true }
@@ -40,7 +40,7 @@ tn-proto = { path = "vendor/wheels/648ec96686e59efaa0b82af88cd8b1126568b15ce4371
 override-dependencies = ["tn-proto==2026.9.10b2.dev2"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/deepvest_tn"]
+packages = ["src/tn_governed"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "dependencies/tn-polars"]

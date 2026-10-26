@@ -7,7 +7,7 @@ use tn_runtime::{ActionOutcome, State};
 #[test]
 fn structured_governance_echo_describes_nested_records_without_scalar_answers() {
     let fixture = Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     let (_keys, runtime) = fixture.runtime();
     let mut session = runtime.start_session(&request).unwrap();
     get_governance(&mut session).unwrap();
@@ -53,7 +53,7 @@ fn structured_governance_echo_describes_nested_records_without_scalar_answers() 
 #[test]
 fn nested_scalar_substitution_still_fails_the_native_exact_comparison() {
     let fixture = Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     let (_keys, runtime) = fixture.runtime();
     let mut session = runtime.start_session(&request).unwrap();
     get_governance(&mut session).unwrap();

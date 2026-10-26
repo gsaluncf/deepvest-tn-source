@@ -4,5 +4,5 @@
   "do_not_use_for": "Trade execution or external redistribution of account-level data.",
   "consequences": "Unauthorized use can expose confidential account information and violate portfolio-data governance.",
   "on_violation_or_error": "log_and_continue",
-  "policy": ".tn/config/agents.md#portfolio.deepvest.calculated@1#sha256:8d4cff488bda7f5680ee4cac470001cb54e66bea1d7d548b51a71acb4a3f8de5"
+  "policy": ".tn/config/agents.md#portfolio.calculation.calculated@1#sha256:398b235838f609ff6dbb7d5c66847935dccb27cc0fc61b857c9727988884a9d7"
 }

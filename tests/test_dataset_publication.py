@@ -7,8 +7,8 @@ from tn_polars.builder import GovernedPolars
 from tn_polars.release import PolicyDenied
 from tn_polars.registry import LocalRegistry
 
-from deepvest_tn.publications import PublicationStore
-from deepvest_tn.unity import (
+from tn_governed.publications import PublicationStore
+from tn_governed.unity import (
     CatalogTrust, originate_policy_revision, publish_dataset_edition, resolve_finance_editions,
 )
 from governed_edition_fixtures import BUSINESS_USE, METADATA_USE
@@ -110,7 +110,7 @@ def test_two_editions_can_reuse_one_exact_accepted_revision(tmp_path):
 
 def test_evaluator_artifact_explicitly_permits_the_named_release_destination(tmp_path):
     kwargs = setup(tmp_path)
-    kwargs["audiences"] = {"deepvest": "confidential"}
+    kwargs["audiences"] = {"calculation": "confidential"}
     published = publish_dataset_edition(**kwargs)
     resolved, = resolve_finance_editions(
         [published.request(BUSINESS_USE)], registry=kwargs["registry"],
@@ -118,7 +118,7 @@ def test_evaluator_artifact_explicitly_permits_the_named_release_destination(tmp
     )
     entry = resolved.entries[kwargs["policy"].revision_id]
     assert entry.evaluator().decide({
-        "operation": "release", "audience": "deepvest", "policy_ref": entry.policy.policy_ref,
+        "operation": "release", "audience": "calculation", "policy_ref": entry.policy.policy_ref,
         "columns": [], "row_selection_sources": [],
     }).allow
 

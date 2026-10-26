@@ -6,8 +6,8 @@ from types import SimpleNamespace
 import pytest
 from tn_polars.registry import LocalRegistry
 
-from deepvest_tn.llama import submit_governed_report
-from deepvest_tn.native_reference import (
+from tn_governed.llama import submit_governed_report
+from tn_governed.native_reference import (
     DESTINATION,
     MODEL_USE,
     finish_governed_reference,
@@ -33,7 +33,7 @@ def test_preparation_pins_real_calculation_and_all_native_service_identities(pre
     assert facts["calculation"]["value"] == -0.25
     assert len(facts["editions"]) == 2
     assert len(facts["source_http_requests"]) == 2
-    source = prepared.calculation.deepvest_object
+    source = prepared.calculation.calculation_object
     assert (prepared.directory / "model-input.tn").read_bytes() == source.forward()
     metadata = json.loads(prepared.metadata_path.read_bytes())
     assert len(metadata["policy_revisions"]) == len(metadata["dataset_editions"]) == 2
@@ -70,7 +70,7 @@ def test_reopen_resolves_the_same_editions_without_republishing(prepared):
     before = {path.name for path in (prepared.store.root / "objects").iterdir()}
     with load_governed_reference(prepared.directory, registry=registry) as reopened:
         assert (
-            reopened.calculation.deepvest_object.wire == prepared.calculation.deepvest_object.wire
+            reopened.calculation.calculation_object.wire == prepared.calculation.calculation_object.wire
         )
         assert [item.selection.edition_record_id for item in reopened.editions] == [
             item.selection.edition_record_id for item in prepared.editions
@@ -80,7 +80,7 @@ def test_reopen_resolves_the_same_editions_without_republishing(prepared):
 
 def test_application_passes_the_existing_release_and_waits_for_recipient(prepared, monkeypatch):
     calls = []
-    source = prepared.calculation.deepvest_object
+    source = prepared.calculation.calculation_object
     release = SimpleNamespace(output_object=source)
 
     class Client:
@@ -100,7 +100,7 @@ def test_application_passes_the_existing_release_and_waits_for_recipient(prepare
         assert calls[-1] == "recipient"
         calls.append(value)
 
-    monkeypatch.setattr("deepvest_tn.llama.GovernedLlamaClient", Client)
+    monkeypatch.setattr("tn_governed.llama.GovernedLlamaClient", Client)
     actual, report = submit_governed_report(
         source,
         prompt="Explain the result.",
@@ -124,15 +124,15 @@ def test_recipient_refusal_does_not_retain_model_release(prepared, monkeypatch):
             pass
 
         def submit_model(self, *_args, **_kwargs):
-            return SimpleNamespace(output_object=prepared.calculation.deepvest_object)
+            return SimpleNamespace(output_object=prepared.calculation.calculation_object)
 
     def refuse(_):
         raise PermissionError("recipient use denied")
 
-    monkeypatch.setattr("deepvest_tn.llama.GovernedLlamaClient", Client)
+    monkeypatch.setattr("tn_governed.llama.GovernedLlamaClient", Client)
     with pytest.raises(PermissionError, match="recipient use denied"):
         submit_governed_report(
-            prepared.calculation.deepvest_object,
+            prepared.calculation.calculation_object,
             prompt="Explain.",
             use=MODEL_USE,
             destination=DESTINATION,
@@ -152,7 +152,7 @@ def test_complete_recipient_path_accepts_a_separate_native_publisher(
 ):
     from tn_llama_client.protocol import NativeModelRelease
 
-    source = prepared.calculation.deepvest_object
+    source = prepared.calculation.calculation_object
     data = prepared.sessions["model-reader"].receive(
         source,
         use=MODEL_USE,
@@ -207,7 +207,7 @@ def test_complete_recipient_path_accepts_a_separate_native_publisher(
             assert use == MODEL_USE and destination == DESTINATION
             return release
 
-    monkeypatch.setattr("deepvest_tn.llama.GovernedLlamaClient", Client)
+    monkeypatch.setattr("tn_governed.llama.GovernedLlamaClient", Client)
     report_path, summary_path = finish_governed_reference(
         prepared,
         base_url="http://unused",
@@ -216,7 +216,7 @@ def test_complete_recipient_path_accepts_a_separate_native_publisher(
     assert report_path.read_text() == "<p>Maximum drawdown: -0.25.</p>"
     facts = json.loads(summary_path.read_bytes())
     assert facts["recipient_contract_count"] == facts["recipient_edition_count"] == 2
-    assert facts["model_source_object_id"] == facts["deepvest_object_id"]
+    assert facts["model_source_object_id"] == facts["calculation_object_id"]
     assert prepared.store.get(output.id) == output.forward()
     for tool in tools:
         assert prepared.store.get(tool.id) == tool.forward()

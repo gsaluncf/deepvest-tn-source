@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import tn
 
-from deepvest_tn.publications import PublicationStore, write_once
+from tn_governed.publications import PublicationStore, write_once
 
 EVIDENCE_TYPE = "experiment.evidence"
 EVIDENCE_SCHEMA = "tn.string-evidence.v1"

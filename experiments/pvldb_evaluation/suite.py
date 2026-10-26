@@ -55,7 +55,7 @@ def graph_signature(root):
 
 
 def storage(root):
-    from deepvest_tn.publications import open_publication_store
+    from tn_governed.publications import open_publication_store
     with open_publication_store(root / "publications", read_only=True) as store:
         objects = store.publication_sizes()
     graph = json.loads((root / "dag.json").read_text()) if (root / "dag.json").exists() else {"nodes": []}

@@ -18,16 +18,16 @@ from tn_llama_client.clients import GovernedLlamaClient, GovernedRequestDenied
 from tn_llama_client.protocol import ReportRelease, SourceRecord
 from tn_llama_client.transcript import HttpTranscript
 
-from deepvest_tn.deepvest import StubDeepVest, execute_deepvest
-from deepvest_tn.getdata import FeedFetchFact
-from deepvest_tn.llama import (
+from tn_governed.calculation import StubCalculationPort, execute_portfolio_calculation
+from tn_governed.getdata import FeedFetchFact
+from tn_governed.llama import (
     adapt_finance_source_record,
     build_finance_governed_request,
     submit_finance_report,
     write_finance_runtime_config,
 )
-from deepvest_tn.polars_stage import GovernedPortfolioResult
-from deepvest_tn.tn_flow import ModelBoundTNRow, TNFlowResult, provision_tn_flow
+from tn_governed.polars_stage import GovernedPortfolioResult
+from tn_governed.tn_flow import ModelBoundTNRow, TNFlowResult, provision_tn_flow
 
 
 @pytest.fixture(autouse=True)
@@ -75,23 +75,23 @@ def governed_flow(tmp_path_factory) -> TNFlowResult:
             {name: frozenset({name}) for name, _dtype in schema}
         ),
         row_sources=frozenset({"account_id", "symbol", "currency"}),
-        policy_ref="tn://policy/deepvest-portfolio-report@1",
+        policy_ref="tn://policy/calculation-portfolio-report@1",
         tn_governance=MappingProxyType(
-            {"policy": "tn://policy/deepvest-portfolio-report@1"}
+            {"policy": "tn://policy/calculation-portfolio-report@1"}
         ),
-        feed_names=("deepvest.internal.positions", "deepvest.market.prices"),
+        feed_names=("portfolio.internal.positions", "portfolio.market.prices"),
         feed_fetch_facts=(
             FeedFetchFact(
-                "getdata.feed_fetched", "deepvest.internal.positions", "/positions", 200,
+                "getdata.feed_fetched", "portfolio.internal.positions", "/positions", 200,
                 "application/x-ndjson",
             ),
             FeedFetchFact(
-                "getdata.feed_fetched", "deepvest.market.prices", "/prices", 200,
+                "getdata.feed_fetched", "portfolio.market.prices", "/prices", 200,
                 "application/x-ndjson",
             ),
         ),
     )
-    execution = execute_deepvest(StubDeepVest(), portfolio)
+    execution = execute_portfolio_calculation(StubCalculationPort(), portfolio)
     return provision_tn_flow(
         portfolio,
         execution,
@@ -129,14 +129,14 @@ def encrypted_release_body(governed_flow: TNFlowResult) -> bytes:
         aad={"governed_by": writer.cfg.device.device_identity, "policy": policy_reference},
         default={
             "report_html": (
-                "<p>DeepVest calculations in this report are deterministic "
-                "stub outputs, not live DeepVest results.</p>"
+                "<p>The calculations in this report are deterministic "
+                "stub outputs, not live calculation results.</p>"
             )
         },
         source_lineage={
             "source_device_identity": governed_flow.source_row.source_writer_did,
             "source_event_id": governed_flow.source_row.event_id,
-            "source_event_type": "portfolio.deepvest.calculated",
+            "source_event_type": "portfolio.calculation.calculated",
             "derived_from_row_hash": governed_flow.source_row.row_hash,
             "source_policy": governed_flow.source_row.policy_reference,
             "selected_sections": ["finance"],
@@ -212,7 +212,7 @@ def _model_bound_row(tmp_path: Path) -> ModelBoundTNRow:
     envelope = {
         "device_identity": "did:key:zFinanceWriter",
         "event_id": "evt-finance-1",
-        "event_type": "portfolio.deepvest.calculated",
+        "event_type": "portfolio.calculation.calculated",
         "finance": {"ciphertext": "finance-ciphertext", "field_hashes": {}},
         "level": "info",
         "prev_hash": "genesis",
@@ -229,7 +229,7 @@ def _model_bound_row(tmp_path: Path) -> ModelBoundTNRow:
         event_id="evt-finance-1",
         row_hash="sha256:finance-row",
         encrypted_groups=("finance", "tn.agents"),
-        policy_reference=".tn/config/agents.md#portfolio.deepvest.calculated@1#sha256:policy",
+        policy_reference=".tn/config/agents.md#portfolio.calculation.calculated@1#sha256:policy",
         source_writer_did="did:key:zFinanceWriter",
         source_ceremony_id="cer-finance",
         source_log_path=(tmp_path / "source.ndjson").resolve(),
@@ -480,7 +480,7 @@ def test_runtime_config_is_the_closed_finance_profile_with_live_material(
         raw_trace_dir=raw_trace_dir,
         model_path=model_path.resolve(),
         server_path=server_path.resolve(),
-        build_id="deepvest-tn-portfolio-demo",
+        build_id="tn-governed-portfolio-demo",
     )
 
     assert written == config_path
@@ -488,7 +488,7 @@ def test_runtime_config_is_the_closed_finance_profile_with_live_material(
     assert document == {
         "version": "tn.llama.runtime.v2",
         "writer_authority": "group_capability",
-        "expected_event_type": "portfolio.deepvest.calculated",
+        "expected_event_type": "portfolio.calculation.calculated",
         "allowed_input_groups": ["finance"],
         "report_contract": {
             "allowed_input_sections": ["finance"],
@@ -499,8 +499,8 @@ def test_runtime_config_is_the_closed_finance_profile_with_live_material(
                 "finance": {
                     "propagate_source_governance": True,
                     "required_attribution": (
-                        "DeepVest calculations in this report are deterministic "
-                        "stub outputs, not live DeepVest results."
+                        "The calculations in this report are deterministic "
+                        "stub outputs, not live calculation results."
                     ),
                     "required_tool": None,
                 }
@@ -528,7 +528,7 @@ def test_runtime_config_is_the_closed_finance_profile_with_live_material(
         "output_index_epoch": 0,
         "audit_path": str(audit_path),
         "raw_trace_dir": str(raw_trace_dir),
-        "build_id": "deepvest-tn-portfolio-demo",
+        "build_id": "tn-governed-portfolio-demo",
         "llama_source_revision": "3f545beccee69d9975f466ec7e45fd9aacd8ba90",
         "model_sha256": "2cbdd631a15e89b1e57204890d9515dc9091da693880f9cde3b32e7bd0f04597",
         "binary_sha256": "537227e448ebb9a8c0274f14f180f77a3a37e02b6343ce9ca9a03787c36fc8e0",
@@ -903,8 +903,8 @@ def test_submit_uses_only_the_governed_route_and_returns_verified_release(
 
     assert isinstance(release, ReportRelease)
     assert release.report_html == (
-        "<p>DeepVest calculations in this report are deterministic "
-        "stub outputs, not live DeepVest results.</p>"
+        "<p>The calculations in this report are deterministic "
+        "stub outputs, not live calculation results.</p>"
     )
     assert len(requests) == 1
     assert requests[0]["path"] == "/v1/tn/chat/completions"
@@ -1105,7 +1105,7 @@ print(json.dumps({
     assert opened["output_event_id"] == wrapper["output_event_id"]
     assert opened["output_row_hash"] == wrapper["output_row_hash"]
     assert opened["report_html"] == (
-        "<p>DeepVest calculations in this report are deterministic "
-        "stub outputs, not live DeepVest results.</p>"
+        "<p>The calculations in this report are deterministic "
+        "stub outputs, not live calculation results.</p>"
     )
     assert received_path.read_text(encoding="utf-8") == wrapper["output_ndjson"]

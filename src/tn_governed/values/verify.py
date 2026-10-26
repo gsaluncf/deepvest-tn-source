@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 
 import tn
-from deepvest_tn.publications import open_publication_store
+from tn_governed.publications import open_publication_store
 
 from .evidence import EvidenceError, verify_tape
 from .primitives import SCHEMA, VALUE_TYPE

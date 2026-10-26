@@ -2,7 +2,7 @@ import socket
 
 import pytest
 
-from deepvest_tn.native_run import governed_server, wsl_command
+from tn_governed.native_run import governed_server, wsl_command
 
 
 def test_wsl_distribution_is_configurable(monkeypatch):
@@ -14,7 +14,7 @@ def test_wsl_distribution_is_configurable(monkeypatch):
 
 def test_runner_refuses_an_occupied_port_before_launch(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "deepvest_tn.native_run.subprocess.Popen",
+        "tn_governed.native_run.subprocess.Popen",
         lambda *_a, **_k: pytest.fail("process launched on an occupied port"),
     )
     with socket.socket() as listener:

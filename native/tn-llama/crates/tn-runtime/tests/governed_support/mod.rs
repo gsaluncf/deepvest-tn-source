@@ -72,7 +72,7 @@ impl Fixture {
         });
         fs::write(input.join("metadata.json"), metadata.to_string()).unwrap();
         let mut config = super::support::fixture_config(&legacy);
-        config.expected_event_type = "deepvest.calculation".into();
+        config.expected_event_type = "calculation.result".into();
         config.allowed_input_groups = ["finance".into(), "audit".into()].into();
         config.report_contract.allowed_input_sections = ["finance".into()].into();
         config.report_contract.section_rules.clear();

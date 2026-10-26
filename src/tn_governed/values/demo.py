@@ -14,7 +14,7 @@ from uuid import uuid4
 
 import tn
 from tn.governed import NotEntitled
-from deepvest_tn.publications import PublicationStore, write_once
+from tn_governed.publications import PublicationStore, write_once
 
 from .catalog import AssignedRules, UnityGovernance
 from .evidence import EvidenceRecorder
@@ -160,7 +160,7 @@ def main():
             tapes[label_] = {**ctx.recorder.export(root / "tapes" / label_),
                              "path": "tapes/" + label_}
         objects = {"report": handle(report), "total": handle(total), "copy": handle(copied)}
-        source_hashes = {"deepvest_tn/governed/" + p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+        source_hashes = {"tn_governed/values/" + p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                          for p in sorted(Path(__file__).parent.glob("*.py"))}
         manifest = {
             "schema": "tn.primitive-run.v1", "created_utc": stamp,

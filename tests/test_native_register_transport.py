@@ -5,8 +5,8 @@ import json
 import pytest
 import tn
 
-from deepvest_tn.native_reference import POLICY
-from deepvest_tn.publications import PublicationStore
+from tn_governed.native_reference import POLICY
+from tn_governed.publications import PublicationStore
 
 
 @pytest.mark.parametrize("enabled", [False, True])

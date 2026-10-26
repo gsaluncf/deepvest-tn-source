@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 from urllib.parse import quote, urlencode
 
-from deepvest_tn.publications import object_digest
+from tn_governed.publications import object_digest
 
 if TYPE_CHECKING:
     from .runtime import Context

@@ -11,8 +11,8 @@ import pytest
 import tn
 from tn.governed import GovernedError
 
-from deepvest_tn.sqlite_publications import SQLitePublicationStore
-from deepvest_tn.governed.evidence import EvidenceError
+from tn_governed.sqlite_publications import SQLitePublicationStore
+from tn_governed.values.evidence import EvidenceError
 from experiments.pvldb_evaluation import verify_frame as module
 from experiments.pvldb_evaluation.run import run_case
 from tn_polars.registry import UnityCatalogRegistry

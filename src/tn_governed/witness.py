@@ -58,7 +58,7 @@ def verify_reference_run(run_directory: Path) -> WitnessResult:
     summary = json.loads((root / "run-summary.json").read_text(encoding="utf-8"))
     runtime = _read_ndjson(root / "runtime" / "decision-events.ndjson")
     client = _read_ndjson(root / "client" / "http.ndjson")
-    source_rows = _read_ndjson(root / "tn" / "deepvest" / ".tn" / "tn" / "logs" / "tn.ndjson")
+    source_rows = _read_ndjson(root / "tn" / "calculation" / ".tn" / "tn" / "logs" / "tn.ndjson")
     output_rows = _read_ndjson(root / "client" / "received-output.ndjson")
 
     request_entries = [
@@ -101,8 +101,8 @@ def verify_reference_run(run_directory: Path) -> WitnessResult:
     packages = root / "tn" / "packages"
     required_packages = {
         "source-to-polars.tnpkg",
-        "polars-to-deepvest.tnpkg",
-        "deepvest-to-llama.tnpkg",
+        "polars-to-calculation.tnpkg",
+        "calculation-to-llama.tnpkg",
         "llama-to-report.tnpkg",
     }
     package_ok = required_packages.issubset(
@@ -171,14 +171,14 @@ def verify_reference_run(run_directory: Path) -> WitnessResult:
         ),
         (
             "Does the evidence link calculation through continuation?",
-            summary["deepvest"].get("invocation_count") == 1
+            summary["calculation"].get("invocation_count") == 1
             and source.get("row_hash") == source_hash
             and output.get("row_hash") == output_hash
             and response.get("source_event_id") == source_id
             and response.get("output_event_id") == output_id
             and release_verified.get("output_row_hash") == output_hash
             and "source_chain_committed" in kinds,
-            ("one DeepVest invocation", "source/output IDs joined", "source chain committed"),
+            ("one calculation invocation", "source/output IDs joined", "source chain committed"),
         ),
     )
     return WitnessResult(

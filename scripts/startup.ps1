@@ -26,7 +26,7 @@ function Start-Unity {
 
 function Start-Reference {
     if ([string]::IsNullOrWhiteSpace($env:TN_LLAMA_API_KEY)) {
-        $env:TN_LLAMA_API_KEY = "deepvest-tn-local"
+        $env:TN_LLAMA_API_KEY = "tn-governed-local"
     }
     & (Join-Path $PSScriptRoot "run-reference-path.ps1") -LlamaPort $LlamaPort
 }
@@ -39,9 +39,9 @@ function Stop-All {
 
 while ($true) {
     Write-Host ""
-    Write-Host "DeepVest-TN local reference path"
+    Write-Host "TN governed workflow local reference path"
     Write-Host "  1  Start Unity"
-    Write-Host "  2  Run full reference path (TN GetData -> Polars -> DeepVest -> tn-llama)"
+    Write-Host "  2  Run full reference path (TN GetData -> Polars -> calculation -> tn-llama)"
     Write-Host "  3  Start all (Unity, then full reference path)"
     Write-Host "  4  Restart Unity"
     Write-Host "  5  Restart full reference path"

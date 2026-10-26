@@ -67,7 +67,7 @@ fn approved_use() -> UseContext {
     UseContext::new("analytics", "portfolio_analysis", "join_prices").unwrap()
 }
 fn later_use() -> UseContext {
-    UseContext::new("deepvest", "portfolio_analysis", "calculate").unwrap()
+    UseContext::new("calculation", "portfolio_analysis", "calculate").unwrap()
 }
 
 struct Fixture {
@@ -629,7 +629,7 @@ fn native_callback_editions_explicitly_omit_external_evaluators() {
     let released = fixture
         .writer()
         .release_for(
-            &mut data, "market.result", &approved_use(), "deepvest", |_| Ok(true),
+            &mut data, "market.result", &approved_use(), "calculation", |_| Ok(true),
         )
         .unwrap();
     fixture
@@ -749,7 +749,7 @@ fn derived_receipt_checks_current_use_every_binding_and_additional_contracts() {
             &mut data,
             "market.result",
             &approved_use(),
-            "deepvest",
+            "calculation",
             |_| Ok(true),
         )
         .unwrap();

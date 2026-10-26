@@ -66,7 +66,7 @@ fn ingest_use() -> UseContext {
 }
 
 fn calculation_use() -> UseContext {
-    UseContext::new("deepvest", "portfolio_analysis", "calculate").unwrap()
+    UseContext::new("calculation", "portfolio_analysis", "calculate").unwrap()
 }
 
 struct Fixture {
@@ -342,7 +342,7 @@ impl Workflow {
                 &mut output,
                 "finance.joined",
                 &ingest_use(),
-                "deepvest",
+                "calculation",
                 |_| Ok(true),
             )
             .unwrap();

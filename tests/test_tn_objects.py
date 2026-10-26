@@ -12,19 +12,19 @@ import tn
 from tn.identity import Identity
 from tn_polars.registry import LocalRegistry
 
-from deepvest_tn.deepvest import StubDeepVest, execute_deepvest_tn_legacy as execute_deepvest_tn
-from deepvest_tn.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
-from deepvest_tn.getdata import GetDataConfig, fetch_governed_feed
-from deepvest_tn.llama import adapt_finance_source_record
-from deepvest_tn.pipeline import run_processing_path
-from deepvest_tn.polars_stage import run_governed_polars_tn_stage
-from deepvest_tn.tn_flow import (
+from tn_governed.calculation import StubCalculationPort, execute_sealed_calculation as execute_calculation
+from tn_governed.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
+from tn_governed.getdata import GetDataConfig, fetch_governed_feed
+from tn_governed.llama import adapt_finance_source_record
+from tn_governed.pipeline import run_processing_path
+from tn_governed.polars_stage import run_governed_polars_tn_stage
+from tn_governed.tn_flow import (
     build_reference_flow,
     provision_reference_path,
-    publish_deepvest_object_for_llama,
+    publish_calculation_object_for_model,
 )
-from deepvest_tn.tn_objects import open_governed_object, seal_governed_object
-from deepvest_tn.unity import (
+from tn_governed.tn_objects import open_governed_object, seal_governed_object
+from tn_governed.unity import (
     FEED_NAMES,
     MARKET_PRICES_FEED,
     POSITIONS_FEED,
@@ -37,7 +37,7 @@ GOVERNANCE = {
     "do_not_use_for": "Trade execution or external redistribution.",
     "consequences": "Unauthorized disclosure of confidential account information.",
     "on_violation_or_error": "stop",
-    "policy": "tn://policy/deepvest-portfolio-report@1",
+    "policy": "tn://policy/calculation-portfolio-report@1",
 }
 
 
@@ -100,16 +100,16 @@ def _enrol(publisher: tn.TN, recipient: tn.TN, package_path: Path) -> None:
 def test_governed_tn_object_crosses_two_keyed_processing_boundaries(tmp_path: Path) -> None:
     source = _endpoint(tmp_path, "source", ["feed_name", "rows"])
     polars = _endpoint(tmp_path, "polars", ["portfolio_values"])
-    deepvest = _endpoint(tmp_path, "deepvest", ["deepvest_result"])
+    calculation = _endpoint(tmp_path, "calculation", ["calculation_result"])
     _enrol(source, polars, tmp_path / "packages" / "source-to-polars.tnpkg")
-    _enrol(polars, deepvest, tmp_path / "packages" / "polars-to-deepvest.tnpkg")
+    _enrol(polars, calculation, tmp_path / "packages" / "polars-to-calculation.tnpkg")
 
     source_object = seal_governed_object(
         source.yaml_path,
         "portfolio.source.v1",
         business_group="finance",
         business_fields={
-            "feed_name": "deepvest.internal.positions",
+            "feed_name": "portfolio.internal.positions",
             "rows": [{"account_id": "acct-001", "quantity": 125}],
         },
         governance=GOVERNANCE,
@@ -121,7 +121,7 @@ def test_governed_tn_object_crosses_two_keyed_processing_boundaries(tmp_path: Pa
         business_group="finance",
     )
     assert opened_source.business == {
-        "feed_name": "deepvest.internal.positions",
+        "feed_name": "portfolio.internal.positions",
         "rows": [{"account_id": "acct-001", "quantity": 125}],
     }
     assert opened_source.governance == GOVERNANCE
@@ -141,7 +141,7 @@ def test_governed_tn_object_crosses_two_keyed_processing_boundaries(tmp_path: Pa
         governance=opened_source.governance,
     )
     opened_polars = open_governed_object(
-        deepvest.yaml_path,
+        calculation.yaml_path,
         polars_object,
         expected_type="portfolio.polars.derived.v1",
         business_group="finance",
@@ -159,18 +159,18 @@ def test_governed_tn_object_crosses_two_keyed_processing_boundaries(tmp_path: Pa
     assert "Internal portfolio" not in str(source_object)
 
 
-def test_deepvest_opens_polars_tn_object_and_seals_its_result_for_llama(
+def test_calculation_opens_polars_tn_object_and_seals_its_result_for_llama(
     tmp_path: Path,
 ) -> None:
     polars = _endpoint(tmp_path, "polars", ["portfolio_values"])
-    deepvest = _endpoint(
+    calculation = _endpoint(
         tmp_path,
-        "deepvest",
-        ["portfolio_values", "deepvest_result"],
+        "calculation",
+        ["portfolio_values", "calculation_result"],
     )
     llama = _endpoint(tmp_path, "llama", ["unused"])
-    _enrol(polars, deepvest, tmp_path / "packages" / "polars-to-deepvest.tnpkg")
-    _enrol(deepvest, llama, tmp_path / "packages" / "deepvest-to-llama.tnpkg")
+    _enrol(polars, calculation, tmp_path / "packages" / "polars-to-calculation.tnpkg")
+    _enrol(calculation, llama, tmp_path / "packages" / "calculation-to-llama.tnpkg")
 
     portfolio_values = [
         {
@@ -193,17 +193,17 @@ def test_deepvest_opens_polars_tn_object_and_seals_its_result_for_llama(
         governance=GOVERNANCE,
     )
 
-    stub = StubDeepVest()
-    execution, deepvest_object = execute_deepvest_tn(
+    stub = StubCalculationPort()
+    execution, calculation_object = execute_calculation(
         stub,
         polars_object,
-        recipient_config_path=deepvest.yaml_path,
-        publisher_config_path=deepvest.yaml_path,
+        recipient_config_path=calculation.yaml_path,
+        publisher_config_path=calculation.yaml_path,
     )
     opened = open_governed_object(
         llama.yaml_path,
-        deepvest_object,
-        expected_type="portfolio.deepvest.calculated",
+        calculation_object,
+        expected_type="portfolio.calculation.calculated",
         business_group="finance",
     )
 
@@ -211,7 +211,7 @@ def test_deepvest_opens_polars_tn_object_and_seals_its_result_for_llama(
     assert execution.result.provider == "stub"
     assert execution.result.live is False
     assert opened.business["portfolio_values"] == portfolio_values
-    assert opened.business["deepvest_result"] == {
+    assert opened.business["calculation_result"] == {
         "calculation_id": "stub-portfolio-risk-001",
         "analysis_type": "portfolio_risk",
         "metrics": [
@@ -246,9 +246,9 @@ def test_polars_opens_source_tn_objects_and_reseals_real_derived_values(
             "native_row_sources",
         ],
     )
-    deepvest = _endpoint(tmp_path, "deepvest", ["unused"])
+    calculation = _endpoint(tmp_path, "calculation", ["unused"])
     _enrol(source, polars, tmp_path / "packages" / "source-to-polars.tnpkg")
-    _enrol(polars, deepvest, tmp_path / "packages" / "polars-to-deepvest.tnpkg")
+    _enrol(polars, calculation, tmp_path / "packages" / "polars-to-calculation.tnpkg")
 
     source_objects = {}
     fixture_files = {
@@ -272,7 +272,7 @@ def test_polars_opens_source_tn_objects_and_reseals_real_derived_values(
         account_id="acct-001",
     )
     opened = open_governed_object(
-        deepvest.yaml_path,
+        calculation.yaml_path,
         portfolio.sealed_object,
         expected_type="portfolio.polars.derived.v1",
         business_group="finance",
@@ -327,13 +327,13 @@ def test_http_data_service_returns_a_tn_object_with_unity_governance(tmp_path: P
     assert b"acct-001" not in fetched.body
 
 
-def test_processing_path_runs_unity_http_polars_and_deepvest_as_tn_objects(
+def test_processing_path_runs_unity_http_polars_and_calculation_as_tn_objects(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     bundles = build_finance_feed_bundles(tmp_path / "bundles")
     unity_locations = {
-        f"deepvest.finance.{name.replace('.', '_')}": bundle.resolve().as_uri()
+        f"portfolio.finance.{name.replace('.', '_')}": bundle.resolve().as_uri()
         for name, bundle in bundles.items()
     }
 
@@ -355,15 +355,15 @@ def test_processing_path_runs_unity_http_polars_and_deepvest_as_tn_objects(
             "native_row_sources",
         ],
     )
-    deepvest = _endpoint(
+    calculation = _endpoint(
         tmp_path,
-        "deepvest",
-        ["portfolio_values", "deepvest_result"],
+        "calculation",
+        ["portfolio_values", "calculation_result"],
     )
     llama = _endpoint(tmp_path, "llama", ["unused"])
     _enrol(source, polars, tmp_path / "packages" / "source-to-polars.tnpkg")
-    _enrol(polars, deepvest, tmp_path / "packages" / "polars-to-deepvest.tnpkg")
-    _enrol(deepvest, llama, tmp_path / "packages" / "deepvest-to-llama.tnpkg")
+    _enrol(polars, calculation, tmp_path / "packages" / "polars-to-calculation.tnpkg")
+    _enrol(calculation, llama, tmp_path / "packages" / "calculation-to-llama.tnpkg")
     server = create_feed_server(
         FeedServerConfig(
             data_dir=seed_finance_feed_data(tmp_path / "data"),
@@ -379,40 +379,40 @@ def test_processing_path_runs_unity_http_polars_and_deepvest_as_tn_objects(
             feed_url=feed_url,
             account_id="acct-001",
             polars_config_path=polars.yaml_path,
-            deepvest_config_path=deepvest.yaml_path,
-            deepvest=StubDeepVest(),
+            calculation_config_path=calculation.yaml_path,
+            calculation=StubCalculationPort(),
         )
     opened = open_governed_object(
         llama.yaml_path,
-        result.deepvest_object,
-        expected_type="portfolio.deepvest.calculated",
+        result.calculation_object,
+        expected_type="portfolio.calculation.calculated",
         business_group="finance",
     )
 
     assert result.polars.values.height == 3
-    assert result.deepvest.result.provider == "stub"
+    assert result.calculation.result.provider == "stub"
     assert adapt_finance_source_record(result.model_row).ndjson == result.model_row.raw_ndjson
-    assert opened.business["deepvest_result"]["calculation_id"] == (
+    assert opened.business["calculation_result"]["calculation_id"] == (
         "stub-portfolio-risk-001"
     )
     assert opened.governance == governance
 
 
-def test_deepvest_tn_object_is_published_as_tn_llamas_existing_chained_row(
+def test_tn_governed_object_is_published_as_tn_llamas_existing_chained_row(
     tmp_path: Path,
 ) -> None:
-    deepvest = _endpoint(
+    calculation = _endpoint(
         tmp_path,
-        "deepvest",
-        ["portfolio_values", "deepvest_result", "run_id"],
+        "calculation",
+        ["portfolio_values", "calculation_result", "run_id"],
     )
-    deepvest_object = seal_governed_object(
-        deepvest.yaml_path,
-        "portfolio.deepvest.calculated",
+    calculation_object = seal_governed_object(
+        calculation.yaml_path,
+        "portfolio.calculation.calculated",
         business_group="finance",
         business_fields={
             "portfolio_values": [{"portfolio_id": "portfolio-001"}],
-            "deepvest_result": {
+            "calculation_result": {
                 "calculation_id": "stub-portfolio-risk-001",
                 "provider": "stub",
                 "live": False,
@@ -421,15 +421,15 @@ def test_deepvest_tn_object_is_published_as_tn_llamas_existing_chained_row(
         governance={
             **GOVERNANCE,
             "policy": (
-                ".tn/config/agents.md#portfolio.deepvest.calculated@1#"
-                "sha256:8d4cff488bda7f5680ee4cac470001cb54e66bea1d7d548b51a71acb4a3f8de5"
+                ".tn/config/agents.md#portfolio.calculation.calculated@1#"
+                "sha256:398b235838f609ff6dbb7d5c66847935dccb27cc0fc61b857c9727988884a9d7"
             ),
         },
     )
 
-    row = publish_deepvest_object_for_llama(
-        deepvest_object,
-        publisher_config_path=deepvest.yaml_path,
+    row = publish_calculation_object_for_model(
+        calculation_object,
+        publisher_config_path=calculation.yaml_path,
     )
     source = adapt_finance_source_record(row)
 
@@ -455,7 +455,7 @@ def test_reference_path_provisions_each_endpoint_before_the_happy_path(
 ) -> None:
     bundles = build_finance_feed_bundles(tmp_path / "bundles")
     unity_locations = {
-        f"deepvest.finance.{name.replace('.', '_')}": bundle.resolve().as_uri()
+        f"portfolio.finance.{name.replace('.', '_')}": bundle.resolve().as_uri()
         for name, bundle in bundles.items()
     }
 
@@ -486,18 +486,18 @@ def test_reference_path_provisions_each_endpoint_before_the_happy_path(
             feed_url=feed_url,
             account_id="acct-001",
             polars_config_path=material.polars_config_path,
-            deepvest_config_path=material.deepvest_config_path,
-            deepvest=StubDeepVest(),
+            calculation_config_path=material.calculation_config_path,
+            calculation=StubCalculationPort(),
         )
     opened = open_governed_object(
         material.input_recipient_config_path,
         result.model_row.raw_ndjson,
-        expected_type="portfolio.deepvest.calculated",
+        expected_type="portfolio.calculation.calculated",
         business_group="finance",
     )
     flow = build_reference_flow(material, result.model_row)
 
-    assert opened.business["deepvest_result"]["provider"] == "stub"
+    assert opened.business["calculation_result"]["provider"] == "stub"
     assert opened.governance == governance
     assert material.input_reader.reader_key_dir.is_dir()
     assert material.output_writer.reader.reader_key_dir.is_dir()

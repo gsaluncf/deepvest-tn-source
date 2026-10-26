@@ -80,7 +80,7 @@ $parentDirectory = [IO.Directory]::GetParent($resolvedDataDirectory).FullName
 [IO.Directory]::CreateDirectory($parentDirectory) | Out-Null
 $stdoutPath = "$resolvedDataDirectory.stdout.log"
 $stderrPath = "$resolvedDataDirectory.stderr.log"
-$commandLine = '""{0}" -m deepvest_tn.feed_server --port {1} --data-directory "{2}" 1> "{3}" 2> "{4}""' -f `
+$commandLine = '""{0}" -m tn_governed.feed_server --port {1} --data-directory "{2}" 1> "{3}" 2> "{4}""' -f `
     $pythonExe, $Port, $resolvedDataDirectory, $stdoutPath, $stderrPath
 $process = Start-Process `
     -FilePath $env:ComSpec `

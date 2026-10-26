@@ -6,9 +6,9 @@ import json
 import pytest
 import tn
 
-from deepvest_tn.publications import PublicationStore
-from deepvest_tn.governed.evidence import EvidenceError, EvidenceRecorder
-from deepvest_tn.governed.verify import verify
+from tn_governed.publications import PublicationStore
+from tn_governed.values.evidence import EvidenceError, EvidenceRecorder
+from tn_governed.values.verify import verify
 from test_primitive_graph_identity import batch_run as batch_run
 
 

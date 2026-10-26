@@ -1,6 +1,6 @@
 """Run numeric integration checks with actual native encryption and signed evidence.
 
-Run: python -m deepvest_tn.governed.verify_numeric
+Run: python -m tn_governed.values.verify_numeric
 This exercises local endpoints; it does not invoke Unity or a model service.
 """
 
@@ -17,7 +17,7 @@ from uuid import uuid4
 import tn
 from tn.governed import NotEntitled
 
-from deepvest_tn.publications import open_publication_store
+from tn_governed.publications import open_publication_store
 from . import Context, EvidenceRecorder, Assessment, Request, TNNumeric, OperationDenied
 from .evidence import verify_tape, EvidenceError
 from .numeric_codec import encode

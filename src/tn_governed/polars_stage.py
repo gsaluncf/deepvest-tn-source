@@ -1,4 +1,4 @@
-"""User-authored governed Polars transformations for the DeepVest workflow."""
+"""User-authored governed Polars transformations for the portfolio workflow."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def prepare_wealth_calculation(
     use: tn.UseContext,
     decide_receive,
 ) -> GovernedLazyFrame:
-    """Admit two exact editions and prepare ordered wealth rows for DeepVest."""
+    """Admit two exact editions and prepare ordered wealth rows for calculation."""
     if wealth_edition.catalog is not calendar_edition.catalog:
         raise ValueError("calculation editions must share one accepted native catalog")
     wealth = GovernedPolars.load_from_tn(
@@ -121,7 +121,7 @@ class GovernedPortfolioResult:
 
 @dataclass(frozen=True, slots=True)
 class GovernedPolarsTNResult:
-    """Real Polars result plus the canonical TN object emitted for DeepVest."""
+    """Real Polars result plus the canonical TN object emitted for calculation."""
 
     _rows: tuple[tuple[object, ...], ...]
     _schema: tuple[tuple[str, pl.DataType], ...]

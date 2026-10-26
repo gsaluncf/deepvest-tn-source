@@ -17,8 +17,8 @@ from urllib.parse import urlparse
 import tn
 from tn_polars.registry import UnityCatalogRegistry, write_edition_bundle
 
-from deepvest_tn.publications import write_once
-from deepvest_tn.unity import CatalogTrust, FinanceEditionRequest, resolve_finance_editions
+from tn_governed.publications import write_once
+from tn_governed.unity import CatalogTrust, FinanceEditionRequest, resolve_finance_editions
 
 from .primitives import OPERATIONS, VALUE_TYPE
 from .runtime import Assessment

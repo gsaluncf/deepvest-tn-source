@@ -8,7 +8,6 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import sys
 from uuid import uuid4
 
 from install_unity import docker, install, wait_ready

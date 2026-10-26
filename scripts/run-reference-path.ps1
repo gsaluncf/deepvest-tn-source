@@ -8,9 +8,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-$commandPath = Join-Path $projectRoot ".venv\Scripts\deepvest-tn.exe"
+$commandPath = Join-Path $projectRoot ".venv\Scripts\tn-governed.exe"
 if (-not (Test-Path -LiteralPath $commandPath -PathType Leaf)) {
-    throw "deepvest-tn command is missing; create the project environment first."
+    throw "tn-governed command is missing; create the project environment first."
 }
 if ([string]::IsNullOrWhiteSpace($env:TN_LLAMA_API_KEY)) {
     throw "TN_LLAMA_API_KEY must be set to a nonempty local API key."
@@ -38,7 +38,7 @@ try {
         "--llama-port", [string]$LlamaPort
     )
     if ($LASTEXITCODE -ne 0) {
-        throw "DeepVest-TN reference path exited with code $LASTEXITCODE."
+        throw "TN governed workflow reference path exited with code $LASTEXITCODE."
     }
 } finally {
     $env:PYTHONPATH = $previousPythonPath

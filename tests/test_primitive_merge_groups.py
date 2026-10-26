@@ -5,12 +5,12 @@ from uuid import uuid4
 import pytest
 import tn
 
-from deepvest_tn.publications import PublicationStore
-from deepvest_tn.governed.evidence import EvidenceRecorder
-from deepvest_tn.governed.metadata import describe
-from deepvest_tn.governed.primitives import Context, SCHEMA, VALUE_TYPE
-from deepvest_tn.governed.runtime import Assessment, Request
-from deepvest_tn.governed.string import OperationDenied, ValueReference
+from tn_governed.publications import PublicationStore
+from tn_governed.values.evidence import EvidenceRecorder
+from tn_governed.values.metadata import describe
+from tn_governed.values.primitives import Context, SCHEMA, VALUE_TYPE
+from tn_governed.values.runtime import Assessment, Request
+from tn_governed.values.string import OperationDenied, ValueReference
 from experiments.pvldb_evaluation.explicit import ExplicitOperations
 
 

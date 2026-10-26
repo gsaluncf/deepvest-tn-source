@@ -60,10 +60,10 @@ class Profiler:
         setattr(cls, name, measured)
 
     def __enter__(self):
-        from deepvest_tn.governed.primitives import Context
-        from deepvest_tn.governed.evidence import EvidenceRecorder
-        from deepvest_tn.publications import PublicationStore
-        from deepvest_tn.sqlite_publications import SQLitePublicationStore
+        from tn_governed.values.primitives import Context
+        from tn_governed.values.evidence import EvidenceRecorder
+        from tn_governed.publications import PublicationStore
+        from tn_governed.sqlite_publications import SQLitePublicationStore
         from tn_polars.tn_boundary import PolicySet
         targets = [
             (Context, "_metadata", "primitive_metadata"),

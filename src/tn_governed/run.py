@@ -1,4 +1,4 @@
-"""One-command composition of the DeepVest--TN workflow."""
+"""One-command composition of the TN governed workflow workflow."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from pathlib import Path
 from tn_llama_client.artifacts import save_report_html
 from tn_llama_client.protocol import ReportRelease
 
-from .deepvest import StubDeepVest, execute_deepvest
+from .calculation import StubCalculationPort, execute_portfolio_calculation
 from .feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
 from .llama import submit_finance_report, write_finance_runtime_config
 from .pipeline import ProcessingPathResult, run_processing_path
@@ -47,11 +47,11 @@ _LLAMA_LAUNCHER_PATH = _TN_LLAMA_ROOT / "scripts" / "llama" / "run-tn-server.ps1
 _ACCOUNT_ID = "acct-001"
 _GOVERNED_ROUTE = "/v1/tn/chat/completions"
 _STUB_DISCLOSURE = (
-    "DeepVest calculations in this report are deterministic stub outputs, "
-    "not live DeepVest results."
+    "The calculations in this report are deterministic stub outputs, "
+    "not live calculation results."
 )
 _FIXED_NARRATIVE_PARAGRAPH = (
-    "This report contains supplied portfolio positions and DeepVest stub risk metrics. "
+    "This report contains supplied portfolio positions and fixed risk metrics. "
     "The metrics and narrative are fixed."
 )
 _REPORT_PROMPT = (
@@ -564,7 +564,7 @@ def _summary_document(
     unity_url: str,
     feed_url: str,
     portfolio: GovernedPortfolioResult,
-    stub: StubDeepVest,
+    stub: StubCalculationPort,
     execution,
     flow: TNFlowResult,
     release: ReportRelease,
@@ -575,7 +575,7 @@ def _summary_document(
     source_event_type = flow.source_row.envelope.get("event_type")
     output_row = json.loads(release.output_ndjson.removesuffix("\n"))
     output_event_type = output_row.get("event_type")
-    if source_event_type != "portfolio.deepvest.calculated":
+    if source_event_type != "portfolio.calculation.calculated":
         raise ValueError("governed source event type changed before summary")
     if output_event_type != "report.generated":
         raise ValueError("verified output event type is not report.generated")
@@ -611,7 +611,7 @@ def _summary_document(
             },
             "row_selection_sources": sorted(portfolio.row_sources),
         },
-        "deepvest": {
+        "calculation": {
             "provider": execution.result.provider,
             "live": execution.result.live,
             "invocation_count": len(stub.invocations),
@@ -702,7 +702,7 @@ def _reference_unity_config(run_directory: Path, unity_url: str) -> UnityCatalog
     namespace = hashlib.sha256(str(run_directory).encode("utf-8")).hexdigest()[:12]
     return UnityCatalogConfig(
         base_url=unity_url,
-        catalog=f"deepvest_{namespace}",
+        catalog=f"calculation_{namespace}",
         schema="finance",
     )
 
@@ -739,7 +739,7 @@ def _reference_summary(
     unity_url: str,
     feed_url: str,
     processing: ProcessingPathResult,
-    stub: StubDeepVest,
+    stub: StubCalculationPort,
     flow: TNFlowResult,
     release: ReportRelease,
     report_path: Path,
@@ -776,16 +776,16 @@ def _reference_summary(
             },
             "row_selection_sources": sorted(processing.polars.row_sources),
         },
-        "deepvest": {
-            "provider": processing.deepvest.result.provider,
-            "live": processing.deepvest.result.live,
+        "calculation": {
+            "provider": processing.calculation.result.provider,
+            "live": processing.calculation.result.live,
             "invocation_count": len(stub.invocations),
-            "calculation_id": processing.deepvest.result.calculation_id,
+            "calculation_id": processing.calculation.result.calculation_id,
         },
         "tn_handoffs": {
             "feed_groups": ["finance", "tn.agents"],
             "polars_groups": ["finance", "tn.agents"],
-            "deepvest_groups": list(flow.source_row.encrypted_groups),
+            "calculation_groups": list(flow.source_row.encrypted_groups),
             "model_source_event_id": flow.source_row.event_id,
             "model_source_row_hash": flow.source_row.row_hash,
             "policy_reference": flow.source_row.policy_reference,
@@ -822,18 +822,18 @@ def run_reference_path(
         )
         unity = _reference_unity_config(run_directory, unity_url)
         publish_finance_feeds(run_directory / "unity-bundles", config=unity)
-        stub = StubDeepVest()
+        stub = StubCalculationPort()
         with _reference_feed_server(run_directory, material.source_config_path) as feed_url:
             processing = run_processing_path(
                 feed_url=feed_url,
                 account_id=_ACCOUNT_ID,
                 polars_config_path=material.polars_config_path,
-                deepvest_config_path=material.deepvest_config_path,
-                deepvest=stub,
+                calculation_config_path=material.calculation_config_path,
+                calculation=stub,
                 unity=unity,
             )
-        if stub.invocations != (processing.deepvest.request,):
-            raise RuntimeError("reference StubDeepVest did not execute exactly once")
+        if stub.invocations != (processing.calculation.request,):
+            raise RuntimeError("reference StubCalculationPort did not execute exactly once")
         flow = build_reference_flow(material, processing.model_row)
 
         runtime_directory = run_directory / "runtime"
@@ -844,7 +844,7 @@ def run_reference_path(
             raw_trace_dir=runtime_directory / "raw-trace",
             model_path=_LLAMA_MODEL_PATH.resolve(),
             server_path=_GOVERNED_SERVER_PATH.resolve(),
-            build_id="deepvest-tn-reference-path",
+            build_id="tn-governed-reference-path",
         )
         _preflight_loopback_port(config.llama_port)
         staged = _stage_governed_build(
@@ -953,12 +953,12 @@ def _run_portfolio_demo_scoped(
         account_id=_ACCOUNT_ID,
         feed_url=feed_url,
     )
-    stub = StubDeepVest()
-    execution = execute_deepvest(stub, portfolio)
+    stub = StubCalculationPort()
+    execution = execute_portfolio_calculation(stub, portfolio)
     if stub.invocations != (execution.request,):
-        raise RuntimeError("portfolio-demo StubDeepVest did not execute exactly once")
+        raise RuntimeError("portfolio-demo StubCalculationPort did not execute exactly once")
     if execution.result.provider != "stub" or execution.result.live is not False:
-        raise RuntimeError("portfolio-demo DeepVest result is not explicitly stubbed")
+        raise RuntimeError("portfolio-demo calculation result is not explicitly stubbed")
 
     flow = _provision_portfolio_demo_tn(run_directory, portfolio, execution)
     runtime_directory = run_directory / "runtime"
@@ -978,7 +978,7 @@ def _run_portfolio_demo_scoped(
         raw_trace_dir=raw_trace_directory,
         model_path=_LLAMA_MODEL_PATH.resolve(),
         server_path=_GOVERNED_SERVER_PATH.resolve(),
-        build_id="deepvest-tn-portfolio-demo",
+        build_id="tn-governed-portfolio-demo",
     )
     _preflight_loopback_port(config.llama_port)
     staged_build_target = run_directory / "execution" / "governed-build"

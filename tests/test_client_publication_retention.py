@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from deepvest_tn import llama
+from tn_governed import llama
 
 
 def test_submit_retains_tools_then_report_only_after_recipient_acceptance(

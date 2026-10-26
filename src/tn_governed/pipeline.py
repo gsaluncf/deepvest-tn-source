@@ -1,4 +1,4 @@
-"""Executable TN-object processing path from Unity resolution through DeepVest."""
+"""Executable TN-object processing path from Unity resolution through calculation."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ from pathlib import Path
 
 import tn
 
-from .deepvest import (
+from .calculation import (
     CalculationExecution,
-    DeepVestExecution,
-    DeepVestPort,
-    execute_deepvest_tn,
-    execute_deepvest_tn_for_llama,
+    PortfolioExecution,
+    CalculationPort,
+    execute_calculation,
+    execute_calculation_for_model,
 )
 from .getdata import FeedFetchFact, GetDataConfig, fetch_governed_feed
 from .polars_stage import (
@@ -31,7 +31,7 @@ class GovernedCalculationPathResult:
     """Exact signed boundaries and the calculation performed between them."""
 
     polars_object: tn.GovernedObject
-    deepvest_object: tn.GovernedObject
+    calculation_object: tn.GovernedObject
     execution: CalculationExecution
     feed_fetch_facts: tuple[FeedFetchFact, ...]
 
@@ -42,22 +42,22 @@ def run_governed_calculation_path(
     calendar_edition,
     getdata: GetDataConfig,
     polars_session: tn.Session,
-    deepvest_session: tn.Session,
+    calculation_session: tn.Session,
     policy_dag: tn.PolicyDag,
     publication_store,
-    deepvest,
+    calculation,
     polars_use: tn.UseContext,
     polars_release_use: tn.UseContext,
-    deepvest_use: tn.UseContext,
-    deepvest_release_use: tn.UseContext,
+    calculation_use: tn.UseContext,
+    calculation_release_use: tn.UseContext,
     decide_source,
     decide_polars_release,
-    decide_deepvest_receive,
-    decide_deepvest_release,
+    decide_calculation_receive,
+    decide_calculation_release,
     to: str,
     decide_ancestor=None,
 ) -> GovernedCalculationPathResult:
-    """Fetch selected publications, prepare wealth, and publish one DeepVest result.
+    """Fetch selected publications, prepare wealth, and publish one calculation result.
 
     Sessions and use contexts belong to the configured receiving endpoints.
     Application callbacks supplement native selection, catalog and ancestry checks.
@@ -75,7 +75,7 @@ def run_governed_calculation_path(
     for item in fetched:
         publication_store.put(tn.GovernedObject.read(io.BytesIO(item.body)))
     polars_object = frame.release_tn(
-        use=polars_release_use, to="deepvest", decide=decide_polars_release,
+        use=polars_release_use, to="calculation", decide=decide_polars_release,
         group="finance", rows_field="rows", object_type="portfolio.calculation.input",
     )
     publication_store.put(polars_object)
@@ -83,12 +83,12 @@ def run_governed_calculation_path(
         wealth_edition.selection.record.source_writer,
         calendar_edition.selection.record.source_writer,
         polars_session.did,
-        deepvest_session.did,
+        calculation_session.did,
     }
 
     def resolve_ancestor(identity):
         object = tn.GovernedObject.read(io.BytesIO(publication_store.get(identity)))
-        view = deepvest_session.governance(object)
+        view = calculation_session.governance(object)
         if object.writer not in accepted_writers:
             raise PermissionError("retained ancestor writer is not accepted by this calculation")
         if decide_ancestor is not None and decide_ancestor(view) is not True:
@@ -99,19 +99,19 @@ def run_governed_calculation_path(
         if (context.writer != polars_session.did
                 or context.object.id != polars_object.id
                 or context.object_type != "portfolio.calculation.input"
-                or context.use_context != deepvest_use):
+                or context.use_context != calculation_use):
             return False
         if not catalog.accepts(context, policy_dag):
             return False
         tn.LineageVerifier().verify(
-            deepvest_session.governance(context.object), catalog, policy_dag, resolve_ancestor,
+            calculation_session.governance(context.object), catalog, policy_dag, resolve_ancestor,
         )
-        return decide_deepvest_receive(context)
+        return decide_calculation_receive(context)
 
-    expected_view = deepvest_session.governance(polars_object)
+    expected_view = calculation_session.governance(polars_object)
     expected_contracts = expected_view.governance.policies
 
-    def accept_deepvest_release(context):
+    def accept_calculation_release(context):
         policies = context.policies
         exact_contracts = (
             len(policies) == len(expected_contracts)
@@ -125,33 +125,33 @@ def run_governed_calculation_path(
             )
         )
         return (
-            context.use_context == deepvest_release_use
+            context.use_context == calculation_release_use
             and context.destination == to
-            and context.object_type == "portfolio.deepvest.calculated"
+            and context.object_type == "portfolio.calculation.calculated"
             and exact_contracts
             and len(context.sources) == 1
             and context.sources[0].references(polars_object)
-            and decide_deepvest_release(context)
+            and decide_calculation_release(context)
         )
 
     work = bind_workflow(
-        deepvest_session,
-        application="deepvest",
-        receive_use=deepvest_use,
-        release_use=deepvest_release_use,
+        calculation_session,
+        application="calculation",
+        receive_use=calculation_use,
+        release_use=calculation_release_use,
         input_type="portfolio.calculation.input",
-        output_type="portfolio.deepvest.calculated",
+        output_type="portfolio.calculation.calculated",
         groups=["finance"],
         to=to,
         decide_receive=accept_calculation,
-        decide_release=accept_deepvest_release,
+        decide_release=accept_calculation_release,
     )
-    execution, deepvest_object = execute_deepvest_tn(
-        deepvest, polars_object, work=work,
+    execution, calculation_object = execute_calculation(
+        calculation, polars_object, work=work,
     )
-    publication_store.put(deepvest_object)
+    publication_store.put(calculation_object)
     return GovernedCalculationPathResult(
-        polars_object, deepvest_object, execution, tuple(item.fact for item in fetched),
+        polars_object, calculation_object, execution, tuple(item.fact for item in fetched),
     )
 
 
@@ -160,8 +160,8 @@ class ProcessingPathResult:
     """The two governed application-stage results produced before tn-llama."""
 
     polars: GovernedPolarsTNResult
-    deepvest: DeepVestExecution
-    deepvest_object: tn.SealedObject
+    calculation: PortfolioExecution
+    calculation_object: tn.SealedObject
     model_row: ModelBoundTNRow
     feed_fetch_facts: tuple[FeedFetchFact, ...]
 
@@ -171,8 +171,8 @@ def run_processing_path_legacy(
     feed_url: str,
     account_id: str,
     polars_config_path: Path,
-    deepvest_config_path: Path,
-    deepvest: DeepVestPort,
+    calculation_config_path: Path,
+    calculation: CalculationPort,
     unity: UnityCatalogConfig | None = None,
 ) -> ProcessingPathResult:
     """Snapshot workflow with a separate logged model publication."""
@@ -186,16 +186,16 @@ def run_processing_path_legacy(
         endpoint_config_path=polars_config_path,
         account_id=account_id,
     )
-    execution, deepvest_object, model_row = execute_deepvest_tn_for_llama(
-        deepvest,
+    execution, calculation_object, model_row = execute_calculation_for_model(
+        calculation,
         polars.sealed_object,
-        recipient_config_path=deepvest_config_path,
-        publisher_config_path=deepvest_config_path,
+        recipient_config_path=calculation_config_path,
+        publisher_config_path=calculation_config_path,
     )
     return ProcessingPathResult(
         polars=polars,
-        deepvest=execution,
-        deepvest_object=deepvest_object,
+        calculation=execution,
+        calculation_object=calculation_object,
         model_row=model_row,
         feed_fetch_facts=tuple(item.fact for item in fetched),
     )

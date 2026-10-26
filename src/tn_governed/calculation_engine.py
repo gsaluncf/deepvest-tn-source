@@ -1,4 +1,4 @@
-"""DeepVest deterministic financial engine.
+"""Deterministic financial calculations.
 
 Ten approved functions over numpy, a closed argument schema for each, and an
 optional FastAPI surface. The registry is the only calculation path the TN
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
-ENGINE_VERSION = "deepvest-engine/1.0.0"
+ENGINE_VERSION = "calculation-engine/1.0.0"
 FREQ_SCALE = {"daily": 252, "weekly": 52, "monthly": 12, "annual": 1}
 
 
@@ -199,7 +199,7 @@ def build_app():
     from fastapi import FastAPI, HTTPException
     from pydantic import BaseModel
 
-    app = FastAPI(title="DeepVest Financial Engine", version=ENGINE_VERSION)
+    app = FastAPI(title="Financial Calculation Service", version=ENGINE_VERSION)
     engine = Engine()
 
     class CalcRequest(BaseModel):

@@ -6,7 +6,7 @@ import shutil
 import pytest
 import tn
 
-from deepvest_tn.unity import resolve_finance_editions
+from tn_governed.unity import resolve_finance_editions
 from governed_edition_fixtures import signed_edition
 from test_unity_editions import request, trust
 from test_unity_registration import VolumeTransport

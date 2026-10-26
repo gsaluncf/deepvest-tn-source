@@ -19,12 +19,12 @@ import zipfile
 import tn
 from tn_polars.opa import OpaWasmEvaluator
 
-from deepvest_tn.publications import open_publication_store, write_once
-from deepvest_tn.governed.evidence import EvidenceError, verify_tape
-from deepvest_tn.governed.primitives import SCHEMA, VALUE_TYPE
-from deepvest_tn.governed.numeric_codec import decode, encode, record_value
-from deepvest_tn.governed.metadata import describe
-from deepvest_tn.governed.provision import POLICY
+from tn_governed.publications import open_publication_store, write_once
+from tn_governed.values.evidence import EvidenceError, verify_tape
+from tn_governed.values.primitives import SCHEMA, VALUE_TYPE
+from tn_governed.values.numeric_codec import decode, encode, record_value
+from tn_governed.values.metadata import describe
+from tn_governed.values.provision import POLICY
 
 
 _STAGES = ("load", "filter", "sort", "with_columns", "select", "release")

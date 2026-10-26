@@ -5,8 +5,8 @@ from contextlib import ExitStack
 import pytest
 import tn
 
-from deepvest_tn.native_reference import provision_reference_sessions
-from deepvest_tn.workflow_setup import bind_workflow
+from tn_governed.native_reference import provision_reference_sessions
+from tn_governed.workflow_setup import bind_workflow
 
 POLICY = """## finance.input
 ### instruction
@@ -34,7 +34,7 @@ Refuse.
 """
 
 
-def uses(application="deepvest"):
+def uses(application="calculation"):
     return (
         tn.UseContext(application, "portfolio_analysis", "calculate"),
         tn.UseContext(application, "model_handoff", "release_calculation"),
@@ -45,7 +45,7 @@ def configured(session, *, decide_receive=lambda _: True, decide_release=lambda 
     receive_use, release_use = uses()
     return bind_workflow(
         session,
-        application="deepvest",
+        application="calculation",
         receive_use=receive_use,
         release_use=release_use,
         input_type="finance.input",
@@ -118,7 +118,7 @@ def test_configured_release_refusal_cannot_be_overridden_per_call():
 
 def test_enrolled_endpoint_identities_and_reader_capabilities_survive_reopen(tmp_path):
     paths = provision_reference_sessions(tmp_path / "sessions")
-    roles = ("source", "polars", "deepvest", "model-reader", "model-writer", "recipient")
+    roles = ("source", "polars", "calculation", "model-reader", "model-writer", "recipient")
     source_use = tn.UseContext("tn-llama", "portfolio_analysis", "read_source")
     report_use = tn.UseContext("reporting", "portfolio_analysis", "read_report")
     with ExitStack() as stack:
@@ -127,7 +127,7 @@ def test_enrolled_endpoint_identities_and_reader_capabilities_survive_reopen(tmp
         }
         identities = {role: session.did for role, session in first.items()}
         assert len(set(identities.values())) == len(roles)
-        for role in ("source", "polars", "deepvest"):
+        for role in ("source", "polars", "calculation"):
             assert first[role].check_groups(["finance"]).is_ready
         assert first["model-writer"].check_groups(["default"]).is_ready
         source = first["source"].create(

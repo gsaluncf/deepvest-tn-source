@@ -16,8 +16,8 @@ from typing import TextIO
 
 _FIXTURE_ROOT = Path(__file__).resolve().parents[2] / "fixtures" / "portfolio"
 _FEED_FILES = {
-    "deepvest.internal.positions": "internal_positions.ndjson",
-    "deepvest.market.prices": "market_prices.ndjson",
+    "portfolio.internal.positions": "internal_positions.ndjson",
+    "portfolio.market.prices": "market_prices.ndjson",
 }
 _NDJSON_CONTENT_TYPE = "application/x-ndjson; charset=utf-8"
 _TN_CONTENT_TYPE = "application/vnd.tn+json; charset=utf-8"
@@ -158,7 +158,7 @@ def _emit_event(
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Seed a fresh directory and serve the two fixed feed routes until interrupted."""
-    parser = ArgumentParser(description="Serve seeded DeepVest finance feed fixtures.")
+    parser = ArgumentParser(description="Serve seeded portfolio feed fixtures.")
     parser.add_argument("--port", required=True, type=int)
     parser.add_argument("--data-directory", required=True, type=Path)
     arguments = parser.parse_args(argv)

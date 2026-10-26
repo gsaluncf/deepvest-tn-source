@@ -104,13 +104,13 @@ impl Fixture {
 }
 
 fn approved_use() -> UseContext {
-    UseContext::new("deepvest", "portfolio_analysis", "calculate").unwrap()
+    UseContext::new("calculation", "portfolio_analysis", "calculate").unwrap()
 }
 
 #[test]
 fn use_context_requires_complete_validated_values_even_through_serde() {
     let context = approved_use();
-    assert_eq!(context.application(), "deepvest");
+    assert_eq!(context.application(), "calculation");
     assert_eq!(context.purpose(), "portfolio_analysis");
     assert_eq!(context.operation(), "calculate");
     assert_eq!(
@@ -119,9 +119,9 @@ fn use_context_requires_complete_validated_values_even_through_serde() {
     );
     for (application, purpose, operation) in [
         ("", "portfolio_analysis", "calculate"),
-        ("deepvest", "  ", "calculate"),
-        ("deepvest", "portfolio_analysis", ""),
-        ("deepvest\0other", "portfolio_analysis", "calculate"),
+        ("calculation", "  ", "calculate"),
+        ("calculation", "portfolio_analysis", ""),
+        ("calculation\0other", "portfolio_analysis", "calculate"),
     ] {
         assert!(UseContext::new(application, purpose, operation).is_err());
         assert!(serde_json::from_value::<UseContext>(json!({
@@ -130,9 +130,9 @@ fn use_context_requires_complete_validated_values_even_through_serde() {
         .is_err());
     }
     for wire in [
-        r#"{"application":"deepvest","operation":"calculate"}"#,
-        r#"{"application":"deepvest","purpose":"portfolio_analysis","operation":"calculate","application":"other"}"#,
-        r#"{"application":"deepvest","purpose":"portfolio_analysis","operation":"calculate","extra":true}"#,
+        r#"{"application":"calculation","operation":"calculate"}"#,
+        r#"{"application":"calculation","purpose":"portfolio_analysis","operation":"calculate","application":"other"}"#,
+        r#"{"application":"calculation","purpose":"portfolio_analysis","operation":"calculate","extra":true}"#,
     ] {
         assert!(serde_json::from_str::<UseContext>(wire).is_err());
     }
@@ -172,8 +172,8 @@ fn every_changed_use_component_is_visible_and_refused_before_business_decryption
     let reader = fixture.reader();
     for use_context in [
         UseContext::new("other", "portfolio_analysis", "calculate").unwrap(),
-        UseContext::new("deepvest", "individual_disclosure", "calculate").unwrap(),
-        UseContext::new("deepvest", "portfolio_analysis", "export").unwrap(),
+        UseContext::new("calculation", "individual_disclosure", "calculate").unwrap(),
+        UseContext::new("calculation", "portfolio_analysis", "export").unwrap(),
     ] {
         assert!(matches!(
             reader.receive_for(
@@ -355,7 +355,7 @@ fn configured_objects_pass_the_strict_use_through_receive_and_release() {
         )
         .unwrap();
     let release_use =
-        UseContext::new("deepvest", "portfolio_analysis", "release_calculation").unwrap();
+        UseContext::new("calculation", "portfolio_analysis", "release_calculation").unwrap();
     let released = objects
         .release_for(
             &mut data,
@@ -376,6 +376,6 @@ fn configured_objects_pass_the_strict_use_through_receive_and_release() {
     );
     assert_eq!(
         governance.governance().fields()["release_context"]["application"],
-        "deepvest"
+        "calculation"
     );
 }

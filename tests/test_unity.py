@@ -9,7 +9,7 @@ import polars as pl
 import pytest
 from tn_polars.registry import LocalRegistry, _load_entry
 
-from deepvest_tn.unity import (
+from tn_governed.unity import (
     FEED_NAMES,
     MARKET_PRICES_FEED,
     POLICY_REF,
@@ -234,12 +234,12 @@ def test_publish_and_resolve_both_exact_unity_feeds(tmp_path: Path, monkeypatch)
 
     assert result.feed_names == FEED_NAMES
     assert [request["name"] for request in transport.volume_requests] == [
-        "deepvest_internal_positions",
-        "deepvest_market_prices",
+        "portfolio_internal_positions",
+        "portfolio_market_prices",
     ]
     assert transport.volumes == {
-        "deepvest.finance.deepvest_internal_positions": result.positions_bundle.resolve().as_uri(),
-        "deepvest.finance.deepvest_market_prices": result.market_prices_bundle.resolve().as_uri(),
+        "portfolio.finance.portfolio_internal_positions": result.positions_bundle.resolve().as_uri(),
+        "portfolio.finance.portfolio_market_prices": result.market_prices_bundle.resolve().as_uri(),
     }
     assert resolved[POSITIONS_FEED].policy.fields["cost_basis"] == "confidential"
     assert resolved[MARKET_PRICES_FEED].policy.fields["last_price"] == "internal"
@@ -253,7 +253,7 @@ def test_resolve_rejects_wrong_registered_bundle_locations(
     transport = install_recording_transport(monkeypatch)
     config = UnityCatalogConfig()
     published = publish_finance_feeds(tmp_path, config=config)
-    market_volume = "deepvest.finance.deepvest_market_prices"
+    market_volume = "portfolio.finance.portfolio_market_prices"
     if bad_location in {"swapped", "duplicate"}:
         transport.volumes[market_volume] = published.positions_bundle.resolve().as_uri()
     else:
@@ -268,5 +268,5 @@ def test_unity_configuration_defaults() -> None:
     registry = unity_catalog_registry(config)
 
     assert (registry.base_url, registry.catalog, registry.schema, registry.token) == (
-        "http://127.0.0.1:8080", "deepvest", "finance", None
+        "http://127.0.0.1:8080", "portfolio", "finance", None
     )

@@ -3,7 +3,7 @@
 import polars as pl
 import tn
 
-from deepvest_tn.unity import resolve_finance_editions
+from tn_governed.unity import resolve_finance_editions
 from governed_edition_fixtures import BUSINESS_USE, signed_edition
 from test_publications import POLICY
 from test_unity_editions import register, request, trust

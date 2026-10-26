@@ -1,4 +1,4 @@
-"""Typed adapters for the actual DeepVest calculation engine."""
+"""Typed adapters for the calculation engine."""
 
 from __future__ import annotations
 
@@ -48,10 +48,10 @@ class CalculationResult:
 def _result(request: CalculationRequest, reply: dict) -> CalculationResult:
     expected = {"function", "function_version", "method", "unit", "value", "status"}
     if not isinstance(reply, dict) or set(reply) != expected:
-        raise ValueError("DeepVest returned an unexpected result schema")
+        raise ValueError("Calculation returned an unexpected result schema")
     if (
         reply["function"] != request.function
-        or reply["function_version"] != "deepvest-engine/1.0.0"
+        or reply["function_version"] != "calculation-engine/1.0.0"
         or reply["method"] != "peak_to_trough_running_max"
         or reply["unit"] != "decimal"
         or reply["status"] != "complete"
@@ -60,7 +60,7 @@ def _result(request: CalculationRequest, reply: dict) -> CalculationResult:
         or not math.isfinite(reply["value"])
         or not -1 <= reply["value"] <= 0
     ):
-        raise ValueError("DeepVest returned a result outside the declared calculation contract")
+        raise ValueError("Calculation returned a result outside the declared calculation contract")
     # This identifies the calculation record. The surrounding TN object signs it.
     invocation = {"request": {"function": request.function, "arguments": request.arguments},
                   "result": reply}
@@ -72,12 +72,12 @@ def _result(request: CalculationRequest, reply: dict) -> CalculationResult:
     )
 
 
-class EngineDeepVestPort:
+class EngineCalculationPort:
     """Call the pinned engine through its closed function registry."""
 
     def __init__(self, engine=None):
         if engine is None:
-            from ._vendor.deepvest_engine import Engine
+            from .calculation_engine import Engine
 
             engine = Engine()
         self.engine = engine
@@ -86,7 +86,7 @@ class EngineDeepVestPort:
         return _result(request, self.engine.call(request.function, request.arguments))
 
 
-class HttpDeepVestPort:
+class HttpCalculationPort:
     """Call the same engine's /calculate endpoint."""
 
     def __init__(self, base_url: str, *, timeout: float = 30.0):
@@ -103,5 +103,5 @@ class HttpDeepVestPort:
         with urllib.request.urlopen(call, timeout=self.timeout) as response:
             raw = response.read(1_048_577)
         if len(raw) > 1_048_576:
-            raise ValueError("DeepVest reply exceeds the configured response limit")
+            raise ValueError("Calculation reply exceeds the configured response limit")
         return _result(request, json.loads(raw))

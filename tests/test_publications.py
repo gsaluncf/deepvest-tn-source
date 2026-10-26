@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 import tn
 
-from deepvest_tn.publications import PublicationStore, open_publication_store
+from tn_governed.publications import PublicationStore, open_publication_store
 
 
 @pytest.fixture(params=["files", "sqlite"])
@@ -54,7 +54,7 @@ def test_retained_publication_is_exact_and_survives_store_restart(tmp_path):
 
 
 def test_identical_retained_bytes_are_not_written_again(tmp_path, monkeypatch):
-    from deepvest_tn import publications
+    from tn_governed import publications
 
     source = publication()
     store = PublicationStore(tmp_path)
@@ -108,7 +108,7 @@ def test_store_detects_content_and_route_index_substitution(tmp_path):
 
 
 def test_get_verifies_the_bytes_already_read_without_reopening_the_file(tmp_path, monkeypatch):
-    from deepvest_tn import publications
+    from tn_governed import publications
 
     source = publication()
     store = PublicationStore(tmp_path)
@@ -188,7 +188,7 @@ def test_native_read_preserves_wire_and_requires_a_new_use_decision(governed_sto
 
 
 def test_record_read_rechecks_authority_after_loading_the_native_object(governed_store):
-    from deepvest_tn.governed.evidence import EvidenceError, EvidenceRecorder, read_record
+    from tn_governed.values.evidence import EvidenceError, EvidenceRecorder, read_record
 
     other_policy = POLICY.replace("portfolio.feed.data.v1", "another.policy")
     with tn.Session(POLICY + "\n" + other_policy, groups=["evidence"]) as session:
@@ -207,7 +207,7 @@ def test_record_read_rechecks_authority_after_loading_the_native_object(governed
 
 def test_string_operations_preserve_claims_and_recheck_permission(governed_store, monkeypatch):
     from uuid import uuid4
-    from deepvest_tn.governed import (
+    from tn_governed.values import (
         Assessment, Context, EvidenceRecorder, OperationDenied, Request, TNString,
     )
 

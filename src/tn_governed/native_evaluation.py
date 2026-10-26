@@ -18,7 +18,7 @@ def verify_admission_refusals(prepared, *, base_url: str, api_key: str):
     """Send matched invalid requests and require zero newly authorized model turns."""
     baseline = json.loads(
         build_model_request(
-            prepared.calculation.deepvest_object,
+            prepared.calculation.calculation_object,
             REPORT_PROMPT,
             MODEL_USE,
             destination=DESTINATION,

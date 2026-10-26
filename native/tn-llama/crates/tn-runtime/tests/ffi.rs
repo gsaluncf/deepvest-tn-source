@@ -124,7 +124,7 @@ fn standalone_ffi_release(with_tool: bool) {
     if with_tool {
         fixture.require_compliance();
     }
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     let mut runtime = null_mut();
     let mut session = null_mut();
     let mut error = empty_owned();
@@ -161,7 +161,7 @@ fn standalone_ffi_release(with_tool: bool) {
                 3 => ("select_sections", json!({"sections":["finance"]})),
                 4 if with_tool && phase_index == 4 => (
                     "log_compliance_creation",
-                    json!({"source_object_id":fixture.manifest["publications"]["deepvest"]["object_id"],"action":"generate_report"}),
+                    json!({"source_object_id":fixture.manifest["publications"]["calculation"]["object_id"],"action":"generate_report"}),
                 ),
                 4 => (
                     "emit_governed_record",

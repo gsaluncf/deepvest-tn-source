@@ -1,10 +1,10 @@
-"""Actual DeepVest calculation and the exact governed invocation record."""
+"""Calculation results and the exact governed invocation record."""
 
 import math
 
 import pytest
 
-from deepvest_tn.deepvest_engine import CalculationRequest, EngineDeepVestPort
+from tn_governed.calculation_client import CalculationRequest, EngineCalculationPort
 
 
 def request():
@@ -12,10 +12,10 @@ def request():
 
 
 def test_actual_engine_computes_peak_to_trough_drawdown():
-    result = EngineDeepVestPort().calculate(request())
+    result = EngineCalculationPort().calculate(request())
     assert result.value == -0.25
     assert result.function == "max_drawdown"
-    assert result.function_version == "deepvest-engine/1.0.0"
+    assert result.function_version == "calculation-engine/1.0.0"
     assert result.method == "peak_to_trough_running_max"
     assert result.unit == "decimal"
     assert result.calculation_id
@@ -44,7 +44,7 @@ def test_engine_error_is_propagated_without_fallback():
             raise error
 
     with pytest.raises(RuntimeError) as caught:
-        EngineDeepVestPort(Engine()).calculate(request())
+        EngineCalculationPort(Engine()).calculate(request())
     assert caught.value is error
 
 
@@ -57,13 +57,13 @@ def test_engine_reply_requires_the_declared_complete_finite_result(change):
     class Engine:
         def call(self, function, args):
             return {
-                "function": "max_drawdown", "function_version": "deepvest-engine/1.0.0",
+                "function": "max_drawdown", "function_version": "calculation-engine/1.0.0",
                 "value": -0.25, "method": "peak_to_trough_running_max", "unit": "decimal",
                 "status": "complete", **change,
             }
 
     with pytest.raises(ValueError):
-        EngineDeepVestPort(Engine()).calculate(request())
+        EngineCalculationPort(Engine()).calculate(request())
 
 
 def test_request_arguments_are_a_detached_snapshot():
@@ -81,8 +81,8 @@ def test_actual_engine_http_service_returns_the_same_calculation():
 
     import uvicorn
 
-    from deepvest_tn._vendor.deepvest_engine import build_app
-    from deepvest_tn.deepvest_engine import HttpDeepVestPort
+    from tn_governed.calculation_engine import build_app
+    from tn_governed.calculation_client import HttpCalculationPort
 
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
@@ -95,8 +95,8 @@ def test_actual_engine_http_service_returns_the_same_calculation():
         while not server.started and time.monotonic() < deadline:
             time.sleep(0.01)
         assert server.started
-        remote = HttpDeepVestPort(f"http://127.0.0.1:{port}").calculate(request())
-        assert remote == EngineDeepVestPort().calculate(request())
+        remote = HttpCalculationPort(f"http://127.0.0.1:{port}").calculate(request())
+        assert remote == EngineCalculationPort().calculate(request())
     finally:
         server.should_exit = True
         worker.join(timeout=5)

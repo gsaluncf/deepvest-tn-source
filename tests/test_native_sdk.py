@@ -29,8 +29,8 @@ def test_current_python_workflow_surface_is_available():
 def test_use_context_is_validated_by_rust():
     import pytest
 
-    context = tn.UseContext("deepvest", "portfolio_analysis", "calculate")
-    assert context.application == "deepvest"
+    context = tn.UseContext("calculation", "portfolio_analysis", "calculate")
+    assert context.application == "calculation"
     assert context.purpose == "portfolio_analysis"
     assert context.operation == "calculate"
     with pytest.raises(ValueError):

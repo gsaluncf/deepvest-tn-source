@@ -14,13 +14,13 @@ import yaml
 from tn.identity import Identity
 from tn_polars.tn_envelopes import DeskLedger
 
-from .deepvest import DeepVestExecution
+from .calculation import PortfolioExecution
 from .polars_stage import GovernedPortfolioResult
 
-_SOURCE_EVENT_TYPE = "portfolio.deepvest.calculated"
+_SOURCE_EVENT_TYPE = "portfolio.calculation.calculated"
 _SOURCE_GROUP = "finance"
 _GOVERNANCE_GROUP = "tn.agents"
-_SOURCE_FIELDS = ("portfolio_values", "deepvest_result", "run_id")
+_SOURCE_FIELDS = ("portfolio_values", "calculation_result", "run_id")
 _GOVERNANCE_FIELDS = (
     "instruction",
     "use_for",
@@ -85,7 +85,7 @@ class ReferencePathMaterial:
 
     source_config_path: Path
     polars_config_path: Path
-    deepvest_config_path: Path
+    calculation_config_path: Path
     input_recipient_config_path: Path
     input_reader: RuntimeReaderMaterial
     output_writer: OutputWriterMaterial
@@ -280,7 +280,7 @@ def _portfolio_payload(portfolio: GovernedPortfolioResult) -> dict[str, object]:
     }
 
 
-def _deepvest_payload(execution: DeepVestExecution) -> dict[str, object]:
+def _calculation_payload(execution: PortfolioExecution) -> dict[str, object]:
     return asdict(execution.result)
 
 
@@ -593,7 +593,7 @@ def provision_reference_path(
     source_agents_path: Path,
     output_agents_path: Path,
 ) -> ReferencePathMaterial:
-    """Provision the source, Polars, DeepVest, tn-llama, and report recipients."""
+    """Provision the source, Polars, calculation, tn-llama, and report recipients."""
     state = _absolute(root)
     if state.exists():
         raise FileExistsError(f"reference-path TN state already exists: {state}")
@@ -614,14 +614,14 @@ def provision_reference_path(
             "native_row_sources",
         ],
     )
-    deepvest_config_path = state / "deepvest" / "tn.yaml"
+    calculation_config_path = state / "calculation" / "tn.yaml"
     _install_agents_policy(
-        deepvest_config_path,
+        calculation_config_path,
         _absolute(source_agents_path).read_text(encoding="utf-8"),
     )
-    deepvest = _create_endpoint(
-        deepvest_config_path,
-        state / "deepvest-identity" / "identity.json",
+    calculation = _create_endpoint(
+        calculation_config_path,
+        state / "calculation-identity" / "identity.json",
         fields=list(_SOURCE_FIELDS),
     )
 
@@ -647,14 +647,14 @@ def provision_reference_path(
         )
 
     enrol(source, polars, "source-to-polars")
-    enrol(polars, deepvest, "polars-to-deepvest")
+    enrol(polars, calculation, "polars-to-calculation")
 
     input_recipient_config_path = state / "llama-input" / "tn.yaml"
     input_recipient = _open_recipient(
         input_recipient_config_path,
         state / "llama-input-identity" / "identity.json",
     )
-    input_reader = enrol(deepvest, input_recipient, "deepvest-to-llama")
+    input_reader = enrol(calculation, input_recipient, "calculation-to-llama")
 
     output_writer, output_index_epoch = _prepare_output_writer(
         config_path=state / "llama-output" / "tn.yaml",
@@ -691,19 +691,19 @@ def provision_reference_path(
     return ReferencePathMaterial(
         source_config_path=_absolute(source.yaml_path),
         polars_config_path=_absolute(polars.yaml_path),
-        deepvest_config_path=_absolute(deepvest.yaml_path),
+        calculation_config_path=_absolute(calculation.yaml_path),
         input_recipient_config_path=_absolute(input_recipient_config_path),
         input_reader=input_reader,
         output_writer=output,
     )
 
 
-def publish_deepvest_object_for_llama(
+def publish_calculation_object_for_model(
     source: tn.SealedObject | Mapping[str, object] | str | bytes | Path,
     *,
     publisher_config_path: Path,
 ) -> ModelBoundTNRow:
-    """Publish a portable DeepVest TN object as tn-llama's chained TN input row."""
+    """Publish a governed calculation object as tn-llama's chained TN input row."""
     from .tn_objects import open_governed_object
 
     opened = open_governed_object(
@@ -712,32 +712,32 @@ def publish_deepvest_object_for_llama(
         expected_type=_SOURCE_EVENT_TYPE,
         business_group=_SOURCE_GROUP,
     )
-    required = {"portfolio_values", "deepvest_result"}
+    required = {"portfolio_values", "calculation_result"}
     if not required.issubset(opened.business):
-        raise ValueError("DeepVest TN object omitted portfolio_values or deepvest_result")
+        raise ValueError("Calculation object omitted portfolio_values or calculation_result")
     policy_reference = opened.governance.get("policy")
     if not isinstance(policy_reference, str) or "#sha256:" not in policy_reference:
-        raise ValueError("DeepVest TN object policy is not content addressed")
+        raise ValueError("Calculation object policy is not content addressed")
 
-    return publish_deepvest_values_for_llama(
+    return publish_calculation_values_for_model(
         portfolio_values=opened.business["portfolio_values"],
-        deepvest_result=opened.business["deepvest_result"],
+        calculation_result=opened.business["calculation_result"],
         governance=opened.governance,
         publisher_config_path=publisher_config_path,
     )
 
 
-def publish_deepvest_values_for_llama(
+def publish_calculation_values_for_model(
     *,
     portfolio_values: object,
-    deepvest_result: object,
+    calculation_result: object,
     governance: Mapping[str, object],
     publisher_config_path: Path,
 ) -> ModelBoundTNRow:
-    """Log DeepVest's in-process result using tn-llama's canonical TN row contract."""
+    """Publish the in-process calculation result using tn-llama's canonical TN row contract."""
     policy_reference = governance.get("policy")
     if not isinstance(policy_reference, str) or "#sha256:" not in policy_reference:
-        raise ValueError("DeepVest governance policy is not content addressed")
+        raise ValueError("Calculation governance policy is not content addressed")
 
     writer = _activate(publisher_config_path)
     tn.ensure_group(
@@ -757,11 +757,11 @@ def publish_deepvest_values_for_llama(
         level="info",
         aad=marker,
         portfolio_values=portfolio_values,
-        deepvest_result=deepvest_result,
+        calculation_result=calculation_result,
         **dict(governance),
     )
     if emitted is None:
-        raise RuntimeError("TN filtered the DeepVest model-bound row")
+        raise RuntimeError("TN filtered the calculation row sent to the model")
     row = _select_exact_row(
         _absolute(cfg.resolve_log_path()),
         emitted,
@@ -775,7 +775,7 @@ def publish_deepvest_values_for_llama(
 
 def provision_tn_flow(
     portfolio: GovernedPortfolioResult,
-    execution: DeepVestExecution,
+    execution: PortfolioExecution,
     *,
     source_project_dir: Path,
     source_identity_dir: Path,
@@ -827,7 +827,7 @@ def provision_tn_flow(
         reader_dir=input_reader_dir,
         index_key_path=input_index_key_path,
         expected_index_epoch=source_index_epoch,
-        label="deepvest-input-runtime",
+        label="calculation-input-runtime",
     )
 
     source_writer = _activate(source_config_path)
@@ -839,7 +839,7 @@ def provision_tn_flow(
     }
     fields = {
         "portfolio_values": _portfolio_payload(portfolio),
-        "deepvest_result": _deepvest_payload(execution),
+        "calculation_result": _calculation_payload(execution),
     }
     emitted = source_writer.log(
         _SOURCE_EVENT_TYPE,
@@ -899,7 +899,7 @@ def provision_tn_flow(
         reader_dir=output_reader_dir,
         index_key_path=output_index_key_path,
         expected_index_epoch=output_index_epoch,
-        label="deepvest-output-runtime",
+        label="calculation-output-runtime",
     )
     output_material = OutputWriterMaterial(
         config_path=_absolute(output_writer_config_path),

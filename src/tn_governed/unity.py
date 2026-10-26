@@ -1,4 +1,4 @@
-"""Build and publish the two governed DeepVest portfolio input feeds."""
+"""Build and publish the two governed portfolio input feeds."""
 
 from __future__ import annotations
 
@@ -18,12 +18,12 @@ from tn_polars.policy import CompiledPolicy
 from tn_polars.registry import UnityCatalogRegistry, verified_edition_entry, write_edition_bundle
 from tn_polars.release import PolicyDenied
 
-POSITIONS_FEED = "deepvest.internal.positions"
-MARKET_PRICES_FEED = "deepvest.market.prices"
+POSITIONS_FEED = "portfolio.internal.positions"
+MARKET_PRICES_FEED = "portfolio.market.prices"
 FEED_NAMES = (POSITIONS_FEED, MARKET_PRICES_FEED)
 POLICY_REF = (
-    ".tn/config/agents.md#portfolio.deepvest.calculated@1#"
-    "sha256:8d4cff488bda7f5680ee4cac470001cb54e66bea1d7d548b51a71acb4a3f8de5"
+    ".tn/config/agents.md#portfolio.calculation.calculated@1#"
+    "sha256:398b235838f609ff6dbb7d5c66847935dccb27cc0fc61b857c9727988884a9d7"
 )
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -58,7 +58,7 @@ class UnityCatalogConfig:
     """Connection settings for the local Unity Catalog service."""
 
     base_url: str = "http://127.0.0.1:8080"
-    catalog: str = "deepvest"
+    catalog: str = "portfolio"
     schema: str = "finance"
     token: str | None = None
 

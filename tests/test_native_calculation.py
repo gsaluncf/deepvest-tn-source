@@ -6,9 +6,9 @@ import pytest
 import tn
 from test_native_tn_objects import POLICY
 
-from deepvest_tn.deepvest import execute_deepvest_tn
-from deepvest_tn.deepvest_engine import EngineDeepVestPort
-from deepvest_tn.workflow_setup import bind_workflow
+from tn_governed.calculation import execute_calculation
+from tn_governed.calculation_client import EngineCalculationPort
+from tn_governed.workflow_setup import bind_workflow
 
 ROWS = [
     {"observed_at": "2026-09-01T16:00:00+00:00", "wealth": 100.0},
@@ -24,7 +24,7 @@ class CountingPort:
 
     def calculate(self, request):
         self.requests.append(request)
-        return EngineDeepVestPort().calculate(request)
+        return EngineCalculationPort().calculate(request)
 
 
 def source(session, rows=ROWS):
@@ -37,18 +37,18 @@ def source(session, rows=ROWS):
 
 def workflow(session, *, accept=lambda _: True, release=lambda _: True):
     return bind_workflow(
-        session, application="deepvest",
-        receive_use=tn.UseContext("deepvest", "portfolio_analysis", "calculate"),
-        release_use=tn.UseContext("deepvest", "portfolio_analysis", "release_calculation"),
+        session, application="calculation",
+        receive_use=tn.UseContext("calculation", "portfolio_analysis", "calculate"),
+        release_use=tn.UseContext("calculation", "portfolio_analysis", "release_calculation"),
         input_type="portfolio.calculation.input",
-        output_type="portfolio.deepvest.calculated",
+        output_type="portfolio.calculation.calculated",
         groups=["finance"], to="tn-llama",
         decide_receive=accept, decide_release=release,
     )
 
 
 def execute(session, publication, port, *, accept=lambda _: True, release=lambda _: True):
-    return execute_deepvest_tn(
+    return execute_calculation(
         port, publication, work=workflow(session, accept=accept, release=release),
     )
 
@@ -78,7 +78,7 @@ def test_native_calculation_preserves_contract_and_exact_parent_and_projects_out
         assert "audit" not in result.envelope
         assert len(output.policies) == 1
         assert output.governance.fields["release_context"] == {
-            "application": "deepvest", "purpose": "portfolio_analysis",
+            "application": "calculation", "purpose": "portfolio_analysis",
             "operation": "release_calculation", "destination": "tn-llama",
         }
 
@@ -98,7 +98,7 @@ def test_exact_source_pin_refuses_before_calculation():
         port = CountingPort()
         work = workflow(session, accept=lambda context: context.object.id == expected.id)
         with pytest.raises(tn.governed.UseDenied):
-            execute_deepvest_tn(port, replacement, work=work)
+            execute_calculation(port, replacement, work=work)
         assert port.requests == []
 
 

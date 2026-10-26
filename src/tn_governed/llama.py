@@ -17,14 +17,14 @@ from .tn_flow import (
     validate_runtime_reader_material,
 )
 
-_FINANCE_EVENT_TYPE = "portfolio.deepvest.calculated"
+_FINANCE_EVENT_TYPE = "portfolio.calculation.calculated"
 _FINANCE_GROUP = "finance"
 _GOVERNANCE_GROUP = "tn.agents"
 _OUTPUT_EVENT_TYPE = "report.generated"
 _LLAMA_SOURCE_REVISION = "3f545beccee69d9975f466ec7e45fd9aacd8ba90"
 _STUB_ATTRIBUTION = (
-    "DeepVest calculations in this report are deterministic stub outputs, "
-    "not live DeepVest results."
+    "The calculations in this report are deterministic stub outputs, "
+    "not live calculation results."
 )
 _POLICY_FIELDS = (
     "instruction",

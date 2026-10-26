@@ -5,7 +5,7 @@ import zipfile
 import pytest
 import tn
 
-from deepvest_tn.unity import resolve_finance_editions
+from tn_governed.unity import resolve_finance_editions
 from governed_edition_fixtures import BUSINESS_USE, signed_edition
 from test_unity_editions import request, trust
 from tn_polars import registry as module
@@ -147,7 +147,7 @@ def test_current_archive_is_rechecked_after_a_warm_module_cache(source, tmp_path
 def test_packed_transport_does_not_change_native_authority_or_use(source, tmp_path, monkeypatch, mismatch):
     root = pack(source, tmp_path)
     loaded = []
-    monkeypatch.setattr("deepvest_tn.unity.verified_edition_entry", lambda *a, **kw: loaded.append(True))
+    monkeypatch.setattr("tn_governed.unity.verified_edition_entry", lambda *a, **kw: loaded.append(True))
     kwargs = ({"use": tn.UseContext("other", "portfolio_analysis", "join_prices")} if mismatch == "use"
               else {"decisions": trust("did:untrusted")})
     with pytest.raises(tn.governed.UseDenied):

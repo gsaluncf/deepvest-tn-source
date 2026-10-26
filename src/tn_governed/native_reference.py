@@ -20,7 +20,7 @@ from tn.signing import DeviceKey
 from tn_llama_client.clients import NativeOutputReader
 from tn_polars.policy import CompiledPolicy
 
-from .deepvest_engine import EngineDeepVestPort
+from .calculation_client import EngineCalculationPort
 from .feed_server import FeedServerConfig, create_feed_server
 from .getdata import GetDataConfig
 from .llama import _LLAMA_SOURCE_REVISION, submit_governed_report
@@ -38,8 +38,8 @@ from .unity import (
 
 POLARS_USE = tn.UseContext("analytics", "portfolio_analysis", "prepare_wealth")
 POLARS_RELEASE = tn.UseContext("analytics", "portfolio_analysis", "release_calculation")
-DEEPVEST_USE = tn.UseContext("deepvest", "portfolio_analysis", "calculate")
-DEEPVEST_RELEASE = tn.UseContext("deepvest", "portfolio_analysis", "release_calculation")
+CALCULATION_USE = tn.UseContext("calculation", "portfolio_analysis", "calculate")
+CALCULATION_RELEASE = tn.UseContext("calculation", "portfolio_analysis", "release_calculation")
 MODEL_USE = tn.UseContext("tn-llama", "portfolio_analysis", "generate_report")
 RECIPIENT_USE = tn.UseContext("reporting", "portfolio_analysis", "read_report")
 METADATA_USE = tn.UseContext("catalog", "metadata_resolution", "read")
@@ -81,7 +81,7 @@ def provision_reference_sessions(root: Path) -> dict[str, Path]:
         (
             "source",
             ["finance", "policy_revision", "dataset_edition", "tn.agents"],
-            [("source", True), ("polars", True), ("deepvest", True), ("model-reader", False)],
+            [("source", True), ("polars", True), ("calculation", True), ("model-reader", False)],
         ),
         ("report", ["default", "tn.agents"], [("model-writer", True), ("recipient", False)]),
     ]:
@@ -149,7 +149,7 @@ class PreparedReference:
 
 
 def prepare_governed_reference(directory: Path, *, unity_url: str, registry=None):
-    """Resolve two signed editions and run real OPA, Polars, and DeepVest."""
+    """Resolve two signed editions and run OPA, Polars, and the calculation engine."""
     directory = Path(directory).resolve()
     directory.mkdir(parents=True, exist_ok=False)
     paths = provision_reference_sessions(directory / "sessions")
@@ -213,7 +213,7 @@ def prepare_governed_reference(directory: Path, *, unity_url: str, registry=None
                     policy=policy,
                     policy_dag=origin_dag,
                     revisions=[revision],
-                    eligible_uses=[POLARS_USE, DEEPVEST_USE, MODEL_USE, RECIPIENT_USE],
+                    eligible_uses=[POLARS_USE, CALCULATION_USE, MODEL_USE, RECIPIENT_USE],
                     grant_ref=f"internal-analysis:{dataset}",
                     administration_contract=administration,
                     trust=trust,
@@ -225,7 +225,7 @@ def prepare_governed_reference(directory: Path, *, unity_url: str, registry=None
                     registry=registry,
                     allowed_operations=["load", "join", "select", "sort", "release"],
                     audiences={
-                        "deepvest": "confidential",
+                        "calculation": "confidential",
                         "tn-llama": "confidential",
                         "reporting": "confidential",
                     },
@@ -252,18 +252,18 @@ def prepare_governed_reference(directory: Path, *, unity_url: str, registry=None
                     calendar_edition=editions[1],
                     getdata=GetDataConfig(f"http://{host}:{port}"),
                     polars_session=sessions["polars"],
-                    deepvest_session=sessions["deepvest"],
+                    calculation_session=sessions["calculation"],
                     policy_dag=dag,
                     publication_store=store,
-                    deepvest=EngineDeepVestPort(),
+                    calculation=EngineCalculationPort(),
                     polars_use=POLARS_USE,
                     polars_release_use=POLARS_RELEASE,
-                    deepvest_use=DEEPVEST_USE,
-                    deepvest_release_use=DEEPVEST_RELEASE,
+                    calculation_use=CALCULATION_USE,
+                    calculation_release_use=CALCULATION_RELEASE,
                     decide_source=lambda ctx: ctx.writer == source.did,
                     decide_polars_release=lambda _: True,
-                    decide_deepvest_receive=lambda _: True,
-                    decide_deepvest_release=lambda _: True,
+                    decide_calculation_receive=lambda _: True,
+                    decide_calculation_release=lambda _: True,
                     to="tn-llama",
                 )
             finally:
@@ -276,12 +276,12 @@ def prepare_governed_reference(directory: Path, *, unity_url: str, registry=None
             "publications": [
                 *(item.source.wire for item in published),
                 calculation.polars_object.wire,
-                calculation.deepvest_object.wire,
+                calculation.calculation_object.wire,
             ],
         }
         metadata_path = directory / "metadata.json"
         write_once(metadata_path, json.dumps(metadata, ensure_ascii=False).encode())
-        write_once(directory / "model-input.tn", calculation.deepvest_object.forward())
+        write_once(directory / "model-input.tn", calculation.calculation_object.forward())
         facts = {
             "profile": "native-governed-reference.v1",
             "unity_url": unity_url,
@@ -297,9 +297,9 @@ def prepare_governed_reference(directory: Path, *, unity_url: str, registry=None
                 for item in editions
             ],
             "polars_object_id": calculation.polars_object.id,
-            "deepvest_object_id": calculation.deepvest_object.id,
+            "calculation_object_id": calculation.calculation_object.id,
             "model_input_wire_sha256": hashlib.sha256(
-                calculation.deepvest_object.forward()
+                calculation.calculation_object.forward()
             ).hexdigest(),
             "calculation": asdict(calculation.execution.result),
             "sessions": {role: session.did for role, session in sessions.items()},
@@ -341,14 +341,14 @@ def write_governed_runtime_config(
     source_config = yaml.safe_load(source_path.read_text())
     output_config = yaml.safe_load(output_path.read_text())
     policies = (
-        prepared.sessions["deepvest"]
-        .governance(prepared.calculation.deepvest_object)
+        prepared.sessions["calculation"]
+        .governance(prepared.calculation.calculation_object)
         .governance.policies
     )
     config = {
         "version": "tn.llama.runtime.v2",
         "writer_authority": "group_capability",
-        "expected_event_type": "portfolio.deepvest.calculated",
+        "expected_event_type": "portfolio.calculation.calculated",
         "allowed_input_groups": ["finance"],
         "governed_objects": {
             "native_reader_config_path": path_for_runtime(source_path),
@@ -356,7 +356,7 @@ def write_governed_runtime_config(
             "use_context": _use_dict(MODEL_USE),
             "destinations": [DESTINATION],
             "trusted_writers": [
-                prepared.sessions[role].did for role in ["source", "polars", "deepvest"]
+                prepared.sessions[role].did for role in ["source", "polars", "calculation"]
             ],
             "authority_writers": [prepared.sessions["source"].did],
             "contracts": [
@@ -460,10 +460,10 @@ def load_governed_reference(directory: Path, *, registry=None):
             registry=registry,
             metadata_store=store,
         )
-        deepvest = tn.GovernedObject.read(io.BytesIO(store.get(facts["deepvest_object_id"])))
+        calculation = tn.GovernedObject.read(io.BytesIO(store.get(facts["calculation_object_id"])))
         polars = tn.GovernedObject.read(io.BytesIO(store.get(facts["polars_object_id"])))
-        if (directory / "model-input.tn").read_bytes() != deepvest.forward() or hashlib.sha256(
-            deepvest.forward()
+        if (directory / "model-input.tn").read_bytes() != calculation.forward() or hashlib.sha256(
+            calculation.forward()
         ).hexdigest() != facts["model_input_wire_sha256"]:
             raise ValueError("retained model input differs from the prepared release")
         return PreparedReference(
@@ -475,7 +475,7 @@ def load_governed_reference(directory: Path, *, registry=None):
             dag,
             store,
             editions,
-            SimpleNamespace(deepvest_object=deepvest, polars_object=polars),
+            SimpleNamespace(calculation_object=calculation, polars_object=polars),
             directory / "metadata.json",
             directory / "preparation.json",
         )
@@ -485,10 +485,10 @@ def load_governed_reference(directory: Path, *, registry=None):
 
 
 def finish_governed_reference(prepared, *, base_url: str, api_key: str, prompt=REPORT_PROMPT):
-    """Submit the exact DeepVest release and save only a recipient-admitted report."""
-    source = prepared.calculation.deepvest_object
+    """Submit the exact calculation release and save only a recipient-admitted report."""
+    source = prepared.calculation.calculation_object
     ancestor_reader = prepared.sessions["model-reader"]
-    accepted_writers = {prepared.sessions[role].did for role in ["source", "polars", "deepvest"]}
+    accepted_writers = {prepared.sessions[role].did for role in ["source", "polars", "calculation"]}
 
     def resolve(identity):
         view = ancestor_reader.governance(

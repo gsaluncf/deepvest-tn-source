@@ -7,7 +7,7 @@ use tn_runtime::{GovernedRuntime, State};
 #[test]
 fn missing_configured_section_terminalizes_and_releases_capacity() {
     let mut fixture = Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     fixture
         .config
         .allowed_input_groups
@@ -26,7 +26,7 @@ fn missing_configured_section_terminalizes_and_releases_capacity() {
 #[test]
 fn absent_business_capability_cannot_reach_value_bearing_turn() {
     let fixture = Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     let path = &fixture
         .config
         .governed_objects
@@ -100,7 +100,7 @@ fn metadata_extra_contract_requires_its_own_accepted_authority() {
 #[test]
 fn all_contracts_are_accepted_before_echo_or_business_exposure() {
     let fixture = Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     let (_keys, runtime) = fixture.runtime();
     let mut session = runtime.start_session(&request).unwrap();
     get_governance(&mut session).unwrap();
@@ -131,7 +131,7 @@ fn all_contracts_are_accepted_before_echo_or_business_exposure() {
 fn either_contract_can_refuse_and_capacity_is_released() {
     for denied in 0..2 {
         let mut fixture = Fixture::new();
-        let request = fixture.request("deepvest");
+        let request = fixture.request("calculation");
         fixture.config.governed_objects.as_mut().unwrap().contracts[denied].allowed_uses =
             [tn_core::governed::UseContext::new(
                 "another-app",
@@ -176,7 +176,7 @@ fn lost_contract_binding_or_ancestor_refuses_before_echo() {
 fn altered_echo_or_unapproved_group_cannot_open_business_data() {
     for bad_echo in [true, false] {
         let fixture = Fixture::new();
-        let request = fixture.request("deepvest");
+        let request = fixture.request("calculation");
         let (_keys, runtime) = fixture.runtime();
         let mut session = runtime.start_session(&request).unwrap();
         get_governance(&mut session).unwrap();

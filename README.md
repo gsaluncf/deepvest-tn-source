@@ -52,20 +52,20 @@ The review requirement has a different effect in this example: the receiving ser
 
 ## Source Guide
 
-The installed `deepvest_tn.governed` package provides `TNString`, `TNNumeric`, `Context`, and `GovernedSQL`. Application adapters are in `deepvest_tn`; the paper's workload drivers are in `experiments/pvldb_evaluation`.
+The installed `tn_governed.values` package provides `TNString`, `TNNumeric`, `Context`, and `GovernedSQL`. Application adapters are in `tn_governed`; the paper's workload drivers are in `experiments/pvldb_evaluation`.
 
 | Source | What to read |
 | --- | --- |
-| [numeric.py](src/deepvest_tn/governed/numeric.py) | Numeric operators and preservation of the underlying Python numeric type |
-| [string.py](src/deepvest_tn/governed/string.py) | Governed string methods, slicing, concatenation and exposure |
-| [primitives.py](src/deepvest_tn/governed/primitives.py) | Authorization, opening values and publishing derived values |
-| [sql.py](src/deepvest_tn/governed/sql.py) | Resolving source governance and returning governed SQL cells |
+| [numeric.py](src/tn_governed/values/numeric.py) | Numeric operators and preservation of the underlying Python numeric type |
+| [string.py](src/tn_governed/values/string.py) | Governed string methods, slicing, concatenation and exposure |
+| [primitives.py](src/tn_governed/values/primitives.py) | Authorization, opening values and publishing derived values |
+| [sql.py](src/tn_governed/values/sql.py) | Resolving source governance and returning governed SQL cells |
 | [frames.py](experiments/pvldb_evaluation/frames.py) | SQL cells through governed Polars and back to a governed number |
 | [numeric_profile.py](experiments/pvldb_evaluation/numeric_profile.py) | Exact dataframe types and range checks |
 | [Native server](native/tn-llama) | Rust governance runtime, TN cryptography, C++ integration and pinned llama.cpp patch |
-| [model.py](src/deepvest_tn/governed/model.py) | Native transfer to the model service and registration of pending review |
+| [model.py](src/tn_governed/values/model.py) | Native transfer to the model service and registration of pending review |
 | [run.py](experiments/pvldb_evaluation/run.py) | Complete setup, execution and verification of the submission example |
-| [evidence.py](src/deepvest_tn/governed/evidence.py) | Signed records of each context's operations |
+| [evidence.py](src/tn_governed/values/evidence.py) | Signed records of each context's operations |
 
 `TNString` subclasses `str`, with a locator in the inherited string buffer. Its protected content is in the TN publication. `TNNumeric` refers to an encrypted number. It preserves `int`, `float`, and `Decimal` behavior by applying operations to the underlying values inside the authorized runtime. Scalar complex results are also supported. The SQL/dataframe example supports integers, floats and decimals.
 
@@ -189,7 +189,7 @@ The installer prints the container name and URL. Stop it with
 This command uses native encryption and signatures without a Unity or model connection:
 
 ```powershell
-python -m deepvest_tn.governed.verify_numeric --run-directory experiments/results/numeric-check
+python -m tn_governed.values.verify_numeric --run-directory experiments/results/numeric-check
 ```
 
 It checks numeric round trips, arithmetic, type promotion, Decimal precision, equality and hashing, multiple-result operations, references to contributing inputs, claim attribution, authorization, decryption capability and signed records. It writes `numeric-verification.json` and the publications used for verification.
@@ -301,25 +301,25 @@ The successful order is:
 3. Python signs and registers the pending-review action for that report.
 4. The call returns the draft and review state.
 
-## DeepVest calculation and report
+## Calculation and report
 
-The DeepVest example adds a calculation service between the dataframe and the LLM. It uses two datasets: wealth observations and a calendar that supplies their timestamps. Each dataset has its own signed policy and version record. Unity locates those records, and the source service supplies the encrypted TN publications.
+This example adds a calculation service between the dataframe and the LLM. It uses two datasets: wealth observations and a calendar that supplies their timestamps. Each dataset has its own signed policy and version record. Unity locates those records, and the source service supplies the encrypted TN publications.
 
-The Polars adapter checks both sources, joins them by observation ID, and orders the rows by timestamp. The resulting wealth sequence is `[100, 120, 90, 110]`. DeepVest calculates maximum drawdown, the largest decline from a previous peak. Here the peak is 120 and the following low is 90, so `(90 - 120) / 120 = -0.25`, a 25% decline.
+The Polars adapter checks both sources, joins them by observation ID, and orders the rows by timestamp. The resulting wealth sequence is `[100, 120, 90, 110]`. The engine calculates maximum drawdown, the largest decline from a previous peak. Here the peak is 120 and the following low is 90, so `(90 - 120) / 120 = -0.25`, a 25% decline.
 
 ### The calculation API
 
 This standalone example calls the same packaged engine used in the governed workflow:
 
 ```python
-from deepvest_tn.deepvest_engine import (
-    CalculationRequest, EngineDeepVestPort,
+from tn_governed.calculation_client import (
+    CalculationRequest, EngineCalculationPort,
 )
 
 request = CalculationRequest(
     "max_drawdown", {"wealth_path": [100, 120, 90, 110]},
 )
-result = EngineDeepVestPort().calculate(request)
+result = EngineCalculationPort().calculate(request)
 assert result.value == -0.25
 assert result.unit == "decimal"
 assert result.method == "peak_to_trough_running_max"
@@ -328,12 +328,12 @@ assert result.method == "peak_to_trough_running_max"
 In the governed workflow, the application passes the dataframe's TN publication to the calculation adapter:
 
 ```python
-from deepvest_tn.deepvest import execute_deepvest_tn
+from tn_governed.calculation import execute_calculation
 
-# Setup has configured work with the DeepVest session, permitted uses,
+# Setup has configured work with the calculation session, permitted uses,
 # source checks, release checks, and report destination.
-execution, calculation_object = execute_deepvest_tn(
-    EngineDeepVestPort(), polars_object, work=work,
+execution, calculation_object = execute_calculation(
+    EngineCalculationPort(), polars_object, work=work,
 )
 ```
 
@@ -341,31 +341,31 @@ The adapter checks permission before reading the `finance` rows. It requires tim
 
 The application sends the calculation publication unchanged to the model service. It checks the requested use and source history before making the permitted content available for report generation. The report recipient checks the returned publication before the application saves its HTML. The result can be traced through the calculation and dataframe join to both original datasets. The market-data example above demonstrates the separate requirement to queue human review.
 
-### Run the complete DeepVest example
+### Run the complete calculation example
 
 Use the Python environment and server build from Setup. Set `TN_LLAMA_MODEL` to your GGUF file and `TN_POLARS_OPA` to OPA if it is not on PATH. Use the same WSL distribution for the build and run. Unity must be running; the supplied installer can start a local instance on port 18080:
 
 ```powershell
-python scripts/install_unity.py --name tn-deepvest-unity --port 18080
+python scripts/install_unity.py --name tn-calculation-unity --port 18080
 ```
 
-If that instance already exists, start it with `docker start tn-deepvest-unity`. Then run:
+If that instance already exists, start it with `docker start tn-calculation-unity`. Then run:
 
 ```powershell
 $env:TN_LLAMA_API_KEY = [guid]::NewGuid().ToString("N")
-deepvest-tn governed-path `
-  --run-directory experiments/results/deepvest-report `
+tn-governed governed-path `
+  --run-directory experiments/results/calculation-report `
   --unity-url http://127.0.0.1:18080 `
   --server-binary .runtime/dependencies/tn-llama/llama-server `
   --model "$env:TN_LLAMA_MODEL" `
   --wsl
 ```
 
-The command creates the example datasets and sessions, resolves their signed records through Unity, performs the join and calculation, runs the native model service, and saves the accepted report. Choose a new run directory for each execution. The command stops its model process when finished. Stop the example Unity container with `docker stop tn-deepvest-unity` when you no longer need it.
+The command creates the example datasets and sessions, resolves their signed records through Unity, performs the join and calculation, runs the native model service, and saves the accepted report. Choose a new run directory for each execution. The command stops its model process when finished. Stop the example Unity container with `docker stop tn-calculation-unity` when you no longer need it.
 
 Inspect `preparation.json` for the calculation and source IDs, `summary.json` for the report ID and accepted policies, and `report.html` for the generated report. `publications/` contains the encrypted, signed objects. Keep the run directory private because it also contains the local session keys.
 
-The implementation is in [pipeline.py](src/deepvest_tn/pipeline.py), [deepvest.py](src/deepvest_tn/deepvest.py), and [native_reference.py](src/deepvest_tn/native_reference.py). The pipeline configures the `work` argument shown above and checks the source policies again before releasing the calculation result.
+The implementation is in [pipeline.py](src/tn_governed/pipeline.py), [calculation.py](src/tn_governed/calculation.py), and [native_reference.py](src/tn_governed/native_reference.py). The pipeline configures the `work` argument shown above and checks the source policies again before releasing the calculation result.
 
 ## Inspect the output
 
@@ -393,6 +393,6 @@ python -m experiments.pvldb_evaluation.verify_numeric_path --run-directory exper
 For the smaller SQL/string/numeric demonstration:
 
 ```powershell
-python -m deepvest_tn.governed.demo --numeric-type Decimal --run-directory experiments/results/sql-primitives
-python -m deepvest_tn.governed.verify experiments/results/sql-primitives
+python -m tn_governed.values.demo --numeric-type Decimal --run-directory experiments/results/sql-primitives
+python -m tn_governed.values.verify experiments/results/sql-primitives
 ```

@@ -16,13 +16,13 @@ from tn_polars import CompiledPolicy
 from tn_polars.registry import LocalRegistry
 from tn_polars.release import PolicyDenied
 
-from deepvest_tn.deepvest_engine import EngineDeepVestPort
-from deepvest_tn.feed_server import FeedServerConfig, create_feed_server
-from deepvest_tn.getdata import FeedFetchResponseError, GetDataConfig
-from deepvest_tn.pipeline import run_governed_calculation_path
-from deepvest_tn.polars_stage import prepare_wealth_calculation
-from deepvest_tn.publications import PublicationStore
-from deepvest_tn.unity import (
+from tn_governed.calculation_client import EngineCalculationPort
+from tn_governed.feed_server import FeedServerConfig, create_feed_server
+from tn_governed.getdata import FeedFetchResponseError, GetDataConfig
+from tn_governed.pipeline import run_governed_calculation_path
+from tn_governed.polars_stage import prepare_wealth_calculation
+from tn_governed.publications import PublicationStore
+from tn_governed.unity import (
     CatalogTrust,
     originate_policy_revision,
     publish_dataset_edition,
@@ -31,8 +31,8 @@ from deepvest_tn.unity import (
 
 POLARS_USE = tn.UseContext("analytics", "portfolio_analysis", "prepare_wealth")
 POLARS_RELEASE = tn.UseContext("analytics", "portfolio_analysis", "release_calculation")
-DEEPVEST_USE = tn.UseContext("deepvest", "portfolio_analysis", "calculate")
-DEEPVEST_RELEASE = tn.UseContext("deepvest", "portfolio_analysis", "release_calculation")
+CALCULATION_USE = tn.UseContext("calculation", "portfolio_analysis", "calculate")
+CALCULATION_RELEASE = tn.UseContext("calculation", "portfolio_analysis", "release_calculation")
 METADATA_USE = tn.UseContext("catalog", "metadata_resolution", "read")
 OPERATIONS = ["load", "join", "select", "sort", "release"]
 
@@ -43,7 +43,7 @@ class CountingPort:
 
     def calculate(self, request):
         self.requests.append(request)
-        return EngineDeepVestPort().calculate(request)
+        return EngineCalculationPort().calculate(request)
 
 
 def configured_sessions(root):
@@ -54,7 +54,7 @@ def configured_sessions(root):
         materials[group] = state.mint(), state.to_bytes()
     index = os.urandom(32)
     paths = []
-    for name in ["source", "polars", "deepvest"]:
+    for name in ["source", "polars", "calculation"]:
         directory = root / name
         keys = directory / ".tn" / "keys"
         keys.mkdir(parents=True)
@@ -101,7 +101,7 @@ def serving(store, root):
 @pytest.fixture
 def setup(tmp_path):
     with ExitStack() as stack:
-        source, polars, deepvest = [stack.enter_context(tn.Session.from_config(path))
+        source, polars, calculation = [stack.enter_context(tn.Session.from_config(path))
                                    for path in configured_sessions(tmp_path / "sessions")]
         trust = CatalogTrust(
             lambda ctx: ctx.writer == source.did,
@@ -131,12 +131,12 @@ def setup(tmp_path):
                     "release": {"public": {"allow_aggregates": False, "min_group_size": 2}},
                 }),
                 session=source, policy=policy, policy_dag=origin_dag, revisions=[revision],
-                eligible_uses=[POLARS_USE, DEEPVEST_USE], grant_ref=f"grant:{name}",
+                eligible_uses=[POLARS_USE, CALCULATION_USE], grant_ref=f"grant:{name}",
                 administration_contract=administration, trust=trust,
                 publish_use=tn.UseContext("source", "portfolio_analysis", "publish"),
                 publish_decide=lambda _: True, destination="analytics", publication_store=store,
                 output_dir=tmp_path / name, registry=registry, allowed_operations=operations,
-                audiences={"deepvest": "confidential", "reporting": "confidential"},
+                audiences={"calculation": "confidential", "reporting": "confidential"},
             )
             built.append(result)
             return result
@@ -158,23 +158,23 @@ def setup(tmp_path):
             )
 
         def run(resolved, *, fetch_store=None, **changes):
-            port = changes.pop("deepvest", CountingPort())
+            port = changes.pop("calculation", CountingPort())
             with serving(fetch_store or store, tmp_path) as getdata:
                 kwargs = dict(
                     wealth_edition=resolved[0], calendar_edition=resolved[1], getdata=getdata,
-                    polars_session=polars, deepvest_session=deepvest, policy_dag=dag,
-                    publication_store=store, deepvest=port,
+                    polars_session=polars, calculation_session=calculation, policy_dag=dag,
+                    publication_store=store, calculation=port,
                     polars_use=POLARS_USE, polars_release_use=POLARS_RELEASE,
-                    deepvest_use=DEEPVEST_USE, deepvest_release_use=DEEPVEST_RELEASE,
+                    calculation_use=CALCULATION_USE, calculation_release_use=CALCULATION_RELEASE,
                     decide_source=lambda ctx: ctx.writer == source.did,
                     decide_polars_release=lambda _: True,
-                    decide_deepvest_receive=lambda _: True,
-                    decide_deepvest_release=lambda _: True, to="reporting",
+                    decide_calculation_receive=lambda _: True,
+                    decide_calculation_release=lambda _: True, to="reporting",
                 )
                 kwargs.update(changes)
                 return run_governed_calculation_path(**kwargs), port
 
-        yield SimpleNamespace(source=source, polars=polars, deepvest=deepvest, dag=dag,
+        yield SimpleNamespace(source=source, polars=polars, calculation=calculation, dag=dag,
                               store=store, editions=editions, run=run, built=built)
 
 
@@ -187,12 +187,12 @@ def test_real_calculation_keeps_two_contracts_exact_parents_and_fetches(setup, m
     assert len(port.requests) == 1
     assert result.execution.source_object_id == result.polars_object.id
     assert not hasattr(result, "model_row")
-    assert setup.source.did != setup.polars.did != setup.deepvest.did
+    assert setup.source.did != setup.polars.did != setup.calculation.did
     assert result.polars_object.writer == setup.polars.did
-    assert result.deepvest_object.writer == setup.deepvest.did
-    for publication in [result.polars_object, result.deepvest_object]:
+    assert result.calculation_object.writer == setup.calculation.did
+    for publication in [result.polars_object, result.calculation_object]:
         assert setup.store.get(publication.id) == publication.forward()
-    view = setup.deepvest.governance(result.deepvest_object)
+    view = setup.calculation.governance(result.calculation_object)
     assert len(view.governance.policies) == len(view.governance.dataset_bindings) == 2
     assert [parent.object_id for parent in view.governance.sources] == [result.polars_object.id]
     frame = setup.polars.receive(result.polars_object, use=POLARS_USE, groups=["finance"],
@@ -207,7 +207,7 @@ def test_real_calculation_keeps_two_contracts_exact_parents_and_fetches(setup, m
         "/v1/publications/" + item.selection.source_object_id.removeprefix("sha256:")
         for item in editions]
     setup.source.close()
-    assert setup.deepvest.governance(result.deepvest_object).object.id == result.deepvest_object.id
+    assert setup.calculation.governance(result.calculation_object).object.id == result.calculation_object.id
 
 
 @pytest.mark.parametrize("side", ["wealth", "calendar"])
@@ -216,16 +216,16 @@ def test_either_real_opa_policy_can_stop_before_engine(setup, side, operation):
     editions = setup.editions(deny_side=side, deny_operation=operation)
     port = CountingPort()
     with pytest.raises(PolicyDenied, match="operation is not enabled"):
-        setup.run(editions, deepvest=port)
+        setup.run(editions, calculation=port)
     assert port.requests == []
 
 
-@pytest.mark.parametrize("stage", ["polars", "deepvest"])
+@pytest.mark.parametrize("stage", ["polars", "calculation"])
 def test_wrong_use_refuses_before_engine(setup, stage):
     editions = setup.editions()
     port = CountingPort()
     with pytest.raises(tn.governed.UseDenied):
-        setup.run(editions, deepvest=port,
+        setup.run(editions, calculation=port,
                   **{f"{stage}_use": tn.UseContext(stage, "other_purpose", "calculate")})
     assert port.requests == []
 
@@ -239,7 +239,7 @@ def test_exact_source_route_substitution_refuses_before_engine(setup):
             return setup.built[1].source.forward()
 
     with pytest.raises(FeedFetchResponseError, match="identity"):
-        setup.run(editions, deepvest=port, fetch_store=SubstitutedStore())
+        setup.run(editions, calculation=port, fetch_store=SubstitutedStore())
     assert port.requests == []
 
 
@@ -247,7 +247,7 @@ def test_ancestor_application_refusal_stops_before_engine(setup):
     editions = setup.editions()
     port = CountingPort()
     with pytest.raises(ValueError, match="ancestor"):
-        setup.run(editions, deepvest=port, decide_ancestor=lambda _: False)
+        setup.run(editions, calculation=port, decide_ancestor=lambda _: False)
     assert port.requests == []
 
 
@@ -275,5 +275,5 @@ def test_missing_retained_ancestor_stops_before_engine(setup):
             raise LookupError("retained ancestor unavailable")
 
     with pytest.raises(ValueError, match="ancestor unavailable"):
-        setup.run(editions, deepvest=port, publication_store=UnavailableAncestorStore())
+        setup.run(editions, calculation=port, publication_store=UnavailableAncestorStore())
     assert port.requests == []

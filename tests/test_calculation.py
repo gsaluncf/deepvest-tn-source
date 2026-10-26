@@ -10,20 +10,20 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from deepvest_tn.deepvest import (
-    DeepVestExecution,
-    DeepVestMetric,
-    DeepVestPort,
-    DeepVestPosition,
-    DeepVestRequest,
-    DeepVestResult,
-    StubDeepVest,
-    build_deepvest_request,
-    execute_deepvest,
+from tn_governed.calculation import (
+    PortfolioExecution,
+    CalculationMetric,
+    CalculationPort,
+    PortfolioPosition,
+    PortfolioRequest,
+    PortfolioResult,
+    StubCalculationPort,
+    build_portfolio_request,
+    execute_portfolio_calculation,
 )
-from deepvest_tn.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
-from deepvest_tn.polars_stage import GovernedPortfolioResult, run_governed_polars_stage
-from deepvest_tn.unity import UnityCatalogConfig, build_finance_feed_bundles
+from tn_governed.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
+from tn_governed.polars_stage import GovernedPortfolioResult, run_governed_polars_stage
+from tn_governed.unity import UnityCatalogConfig, build_finance_feed_bundles
 
 FIXTURE_ROOT = Path("fixtures/portfolio")
 POSITIONS_PATH = FIXTURE_ROOT / "internal_positions.ndjson"
@@ -45,7 +45,7 @@ def _running_feed_server(server) -> Iterator[str]:
 
 @pytest.fixture()
 def feed_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
-    data_dir = seed_finance_feed_data(tmp_path_factory.mktemp("deepvest-getdata") / "data")
+    data_dir = seed_finance_feed_data(tmp_path_factory.mktemp("calculation-getdata") / "data")
     server = create_feed_server(
         FeedServerConfig(data_dir=data_dir, event_stream=io.StringIO(), port=0)
     )
@@ -68,7 +68,7 @@ class RecordingUnityTransport:
 
 @pytest.fixture(scope="module")
 def finance_bundles(tmp_path_factory) -> dict[str, Path]:
-    return build_finance_feed_bundles(tmp_path_factory.mktemp("deepvest-finance-bundles"))
+    return build_finance_feed_bundles(tmp_path_factory.mktemp("calculation-finance-bundles"))
 
 
 @pytest.fixture()
@@ -87,14 +87,14 @@ def governed_portfolio(monkeypatch, finance_bundles, feed_url: str) -> GovernedP
     )
 
 
-def expected_stub_result() -> DeepVestResult:
-    return DeepVestResult(
+def expected_stub_result() -> PortfolioResult:
+    return PortfolioResult(
         calculation_id="stub-portfolio-risk-001",
         analysis_type="portfolio_risk",
         metrics=(
-            DeepVestMetric("value_at_risk_95", 12500.0, "USD"),
-            DeepVestMetric("expected_shortfall_95", 16800.0, "USD"),
-            DeepVestMetric("maximum_drawdown", -0.18, "ratio"),
+            CalculationMetric("value_at_risk_95", 12500.0, "USD"),
+            CalculationMetric("expected_shortfall_95", 16800.0, "USD"),
+            CalculationMetric("maximum_drawdown", -0.18, "ratio"),
         ),
         provider="stub",
         live=False,
@@ -104,11 +104,11 @@ def expected_stub_result() -> DeepVestResult:
 def test_real_governed_result_becomes_exact_ordered_allowlisted_request(
     governed_portfolio: GovernedPortfolioResult,
 ) -> None:
-    request = build_deepvest_request(governed_portfolio)
+    request = build_portfolio_request(governed_portfolio)
 
-    assert request == DeepVestRequest(
+    assert request == PortfolioRequest(
         positions=(
-            DeepVestPosition(
+            PortfolioPosition(
                 portfolio_id="portfolio-001",
                 symbol="AAPL",
                 quantity=125,
@@ -119,7 +119,7 @@ def test_real_governed_result_becomes_exact_ordered_allowlisted_request(
                 as_of="2026-09-01T16:00:00Z",
                 market_source="deterministic-market-fixture",
             ),
-            DeepVestPosition(
+            PortfolioPosition(
                 portfolio_id="portfolio-001",
                 symbol="MSFT",
                 quantity=80,
@@ -130,7 +130,7 @@ def test_real_governed_result_becomes_exact_ordered_allowlisted_request(
                 as_of="2026-09-01T16:00:00Z",
                 market_source="deterministic-market-fixture",
             ),
-            DeepVestPosition(
+            PortfolioPosition(
                 portfolio_id="portfolio-001",
                 symbol="VTI",
                 quantity=210,
@@ -155,26 +155,26 @@ def test_execute_calls_substitutable_port_once_and_retains_exact_exchange(
 
     class RecordingPort:
         def __init__(self) -> None:
-            self.requests: list[DeepVestRequest] = []
+            self.requests: list[PortfolioRequest] = []
 
-        def calculate(self, request: DeepVestRequest) -> DeepVestResult:
+        def calculate(self, request: PortfolioRequest) -> PortfolioResult:
             self.requests.append(request)
             return result
 
     port = RecordingPort()
-    assert isinstance(port, DeepVestPort)
+    assert isinstance(port, CalculationPort)
 
-    execution = execute_deepvest(port, governed_portfolio)
+    execution = execute_portfolio_calculation(port, governed_portfolio)
 
     assert len(port.requests) == 1
-    assert execution == DeepVestExecution(request=port.requests[0], result=result)
+    assert execution == PortfolioExecution(request=port.requests[0], result=result)
 
 
 def test_stub_records_exact_request_and_returns_fixed_non_live_result(
     governed_portfolio: GovernedPortfolioResult,
 ) -> None:
-    request = build_deepvest_request(governed_portfolio)
-    stub = StubDeepVest()
+    request = build_portfolio_request(governed_portfolio)
+    stub = StubCalculationPort()
 
     result = stub.calculate(request)
 
@@ -187,10 +187,10 @@ def test_stub_records_exact_request_and_returns_fixed_non_live_result(
 def test_semantic_input_change_is_recorded_but_does_not_change_stub_result(
     governed_portfolio: GovernedPortfolioResult,
 ) -> None:
-    original = build_deepvest_request(governed_portfolio)
+    original = build_portfolio_request(governed_portfolio)
     changed_position = replace(original.positions[0], position_market_value=1.0)
     changed = replace(original, positions=(changed_position, *original.positions[1:]))
-    stub = StubDeepVest()
+    stub = StubCalculationPort()
 
     original_result = stub.calculate(original)
     changed_result = stub.calculate(changed)
@@ -203,8 +203,8 @@ def test_semantic_input_change_is_recorded_but_does_not_change_stub_result(
 def test_two_direct_stub_calls_both_succeed_and_are_recorded(
     governed_portfolio: GovernedPortfolioResult,
 ) -> None:
-    request = build_deepvest_request(governed_portfolio)
-    stub = StubDeepVest()
+    request = build_portfolio_request(governed_portfolio)
+    stub = StubCalculationPort()
 
     first = stub.calculate(request)
     second = stub.calculate(request)
@@ -216,20 +216,20 @@ def test_two_direct_stub_calls_both_succeed_and_are_recorded(
 def test_raising_port_is_attempted_once_without_retry_or_fallback(
     governed_portfolio: GovernedPortfolioResult,
 ) -> None:
-    failure = RuntimeError("DeepVest boundary unavailable")
+    failure = RuntimeError("Calculation boundary unavailable")
 
     class RaisingPort:
         def __init__(self) -> None:
             self.attempts = 0
 
-        def calculate(self, request: DeepVestRequest) -> DeepVestResult:
+        def calculate(self, request: PortfolioRequest) -> PortfolioResult:
             self.attempts += 1
             raise failure
 
     port = RaisingPort()
 
     with pytest.raises(RuntimeError) as caught:
-        execute_deepvest(port, governed_portfolio)
+        execute_portfolio_calculation(port, governed_portfolio)
 
     assert caught.value is failure
     assert port.attempts == 1
@@ -238,10 +238,10 @@ def test_raising_port_is_attempted_once_without_retry_or_fallback(
 def test_contract_and_exposed_invocation_history_are_deeply_immutable(
     governed_portfolio: GovernedPortfolioResult,
 ) -> None:
-    request = build_deepvest_request(governed_portfolio)
-    stub = StubDeepVest()
+    request = build_portfolio_request(governed_portfolio)
+    stub = StubCalculationPort()
     result = stub.calculate(request)
-    execution = DeepVestExecution(request, result)
+    execution = PortfolioExecution(request, result)
     history = stub.invocations
 
     with pytest.raises(FrozenInstanceError):
@@ -268,7 +268,7 @@ class CountingPort:
     def __init__(self) -> None:
         self.calls = 0
 
-    def calculate(self, request: DeepVestRequest) -> DeepVestResult:
+    def calculate(self, request: PortfolioRequest) -> PortfolioResult:
         self.calls += 1
         return expected_stub_result()
 
@@ -295,7 +295,7 @@ def test_empty_table_fails_before_the_port_is_called(
     port = CountingPort()
 
     with pytest.raises(ValueError, match="empty"):
-        execute_deepvest(port, empty)
+        execute_portfolio_calculation(port, empty)
 
     assert port.calls == 0
 
@@ -320,7 +320,7 @@ def test_mixed_context_fails_before_the_port_is_called(
     port = CountingPort()
 
     with pytest.raises(ValueError, match=message):
-        execute_deepvest(port, mixed)
+        execute_portfolio_calculation(port, mixed)
 
     assert port.calls == 0
 
@@ -332,7 +332,7 @@ def test_stub_execution_creates_no_local_artifacts(
 ) -> None:
     monkeypatch.chdir(tmp_path)
 
-    execution = execute_deepvest(StubDeepVest(), governed_portfolio)
+    execution = execute_portfolio_calculation(StubCalculationPort(), governed_portfolio)
 
     assert execution.result == expected_stub_result()
     assert list(tmp_path.iterdir()) == []

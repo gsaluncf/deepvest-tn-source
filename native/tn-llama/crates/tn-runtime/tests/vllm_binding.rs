@@ -280,7 +280,7 @@ fn llama_runtime_rejects_vllm_manifest() {
 #[test]
 fn one_vllm_runtime_owns_independent_concurrent_sessions() {
     let mut fixture = governed_support::Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     fixture.config.max_active_sessions = 2;
     let runtime = GovernedRuntime::from_config_with_backend(
         fixture.config,

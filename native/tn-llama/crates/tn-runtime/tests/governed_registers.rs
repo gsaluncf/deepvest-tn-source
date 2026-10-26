@@ -43,7 +43,7 @@ fn register_child() {
     let directory =
         std::path::PathBuf::from(std::env::var_os("TN_LLAMA_REGISTER_TEST_ROOT").unwrap());
     let fixture = Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     let audit = fixture.config.audit_path.clone();
     let output_config = fixture.config.output_tn_config_path.clone();
     let use_context = fixture

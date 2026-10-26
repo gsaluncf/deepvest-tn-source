@@ -24,10 +24,10 @@ fn native_action_request_exposes_current_arguments_separately_from_ancestor_ids(
         let fixture = fixture();
         let profile = fixture.config.governed_objects.as_ref().unwrap();
         let source = tn_core::runtime::Objects::open(&profile.native_reader_config_path).unwrap();
-        let original_wire = fixture.manifest["publications"]["deepvest"]["wire"]
+        let original_wire = fixture.manifest["publications"]["calculation"]["wire"]
             .as_str()
             .unwrap();
-        let original_id = fixture.manifest["publications"]["deepvest"]["object_id"]
+        let original_id = fixture.manifest["publications"]["calculation"]["object_id"]
             .as_str()
             .unwrap()
             .to_owned();
@@ -56,7 +56,7 @@ fn native_action_request_exposes_current_arguments_separately_from_ancestor_ids(
             .unwrap()
             .push(json!(original_wire));
         std::fs::write(&profile.metadata_store_path, metadata.to_string()).unwrap();
-        let mut request: Value = serde_json::from_slice(&fixture.request("deepvest")).unwrap();
+        let mut request: Value = serde_json::from_slice(&fixture.request("calculation")).unwrap();
         request["tn_object"] = json!(current.wire());
         let request = serde_json::to_vec(&request).unwrap();
         assert!(
@@ -98,7 +98,7 @@ fn native_action_request_exposes_current_arguments_separately_from_ancestor_ids(
 #[test]
 fn native_tool_executes_once_and_signed_result_reenters_before_report() {
     let fixture = fixture();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     let output_config = fixture.config.output_tn_config_path.clone();
     let use_context = fixture
         .config
@@ -230,7 +230,7 @@ fn native_tool_missing_wrong_arguments_repeated_and_forged_receipt_are_terminal(
         "forged_report_receipt",
     ] {
         let fixture = fixture();
-        let request = fixture.request("deepvest");
+        let request = fixture.request("calculation");
         let (_keys, runtime) = fixture.runtime();
         let mut session = runtime.start_session(&request).unwrap();
         get_governance(&mut session).unwrap();
@@ -290,7 +290,7 @@ fn native_tool_missing_wrong_arguments_repeated_and_forged_receipt_are_terminal(
 #[test]
 fn native_tool_readback_failure_never_reinserts_a_receipt_or_releases_report() {
     let fixture = fixture();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     std::fs::copy(
         fixture.config.reader_key_dir.join("tn.agents.btn.mykit"),
         fixture

@@ -16,8 +16,8 @@ import subprocess
 from uuid import uuid4
 
 import tn
-from deepvest_tn.native_run import governed_server, wsl_path
-from deepvest_tn.publications import PublicationStore, write_once
+from tn_governed.native_run import governed_server, wsl_path
+from tn_governed.publications import PublicationStore, write_once
 
 from .catalog import AssignedRules, UnityGovernance
 from .demo import handle
@@ -178,7 +178,7 @@ def main():
                     "native_module_sha256": digest(native_module), "wheel_sha256": sdk["wheel_sha256"],
                     "repository_commit": subprocess.run(["git", "rev-parse", "HEAD"], cwd=repository,
                                                          text=True, capture_output=True, check=True).stdout.strip(),
-                    "experiment_source_sha256": {"deepvest_tn/governed/" + p.name: digest(p)
+                    "experiment_source_sha256": {"tn_governed/values/" + p.name: digest(p)
                         for p in sorted(Path(__file__).parent.glob("*.py"))}},
                 "scope": "Synthetic market data and demonstration policy.",
             }

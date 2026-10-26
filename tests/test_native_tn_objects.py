@@ -3,7 +3,7 @@
 import pytest
 import tn
 
-from deepvest_tn import tn_objects
+from tn_governed import tn_objects
 
 POLICY = """## finance.account
 ### instruction
@@ -29,7 +29,7 @@ def test_origin_and_receipt_use_native_objects_without_global_identity_switch(mo
             session, {"rows": [{"amount": 12}, {"amount": 18}]},
             session.policy("finance.account"), object_type="finance.account", group="finance",
         )
-        use = tn.UseContext("deepvest", "portfolio_analysis", "calculate")
+        use = tn.UseContext("calculation", "portfolio_analysis", "calculate")
         seen = []
 
         def accept(context):
@@ -58,7 +58,7 @@ def test_refused_receipt_never_invokes_calculation(reason):
         def receive_and_calculate():
             working = tn_objects.receive_governed_object(
                 session, source.snapshot.wire,
-                use=tn.UseContext("deepvest", "portfolio_analysis", "calculate"),
+                use=tn.UseContext("calculation", "portfolio_analysis", "calculate"),
                 groups=["finance"],
                 decide=lambda context: {
                     "writer": context.writer == "unaccepted writer",

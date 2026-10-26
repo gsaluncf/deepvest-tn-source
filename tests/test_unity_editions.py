@@ -2,8 +2,8 @@ import pytest
 import tn
 from tn_polars.registry import LocalRegistry
 
-from deepvest_tn.unity import CatalogTrust, FinanceEditionRequest, resolve_finance_editions
-from deepvest_tn.publications import PublicationStore
+from tn_governed.unity import CatalogTrust, FinanceEditionRequest, resolve_finance_editions
+from tn_governed.publications import PublicationStore
 from governed_edition_fixtures import BUSINESS_USE, METADATA_USE, signed_edition
 
 
@@ -110,7 +110,7 @@ def test_metadata_authority_refusal_precedes_evaluator_preparation(tmp_path, mon
         decisions = CatalogTrust(decisions.metadata, decisions.policy_revision,
                                  lambda record: False, METADATA_USE)
     prepared = []
-    monkeypatch.setattr("deepvest_tn.unity.verified_edition_entry", lambda *args: prepared.append(args))
+    monkeypatch.setattr("tn_governed.unity.verified_edition_entry", lambda *args: prepared.append(args))
     with pytest.raises(tn.governed.GovernedError):
         resolve_finance_editions(
             [request(fixture)], registry=registry, catalog_session=fixture.session,

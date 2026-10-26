@@ -24,18 +24,18 @@ import tn
 import tn_llama_client
 import tn_polars
 
-import deepvest_tn.governed as governed
-from deepvest_tn.native_run import governed_server, wsl_path
-from deepvest_tn.publications import open_publication_store, write_once
-from deepvest_tn.governed.market_report import (
+import tn_governed.values as governed
+from tn_governed.native_run import governed_server, wsl_path
+from tn_governed.publications import open_publication_store, write_once
+from tn_governed.values.market_report import (
     APPLICATION, MODEL_USE, NOTICE, PURPOSE, RECIPIENT_USE, REVIEW_ACTION, policy,
 )
-from deepvest_tn.governed.catalog import AssignedRules
-from deepvest_tn.governed.demo import handle
-from deepvest_tn.governed.evidence import EvidenceRecorder
-from deepvest_tn.governed.model import NativeModelEndpoint, digest, prepare_native_model
-from deepvest_tn.governed.provision import provision
-from deepvest_tn.governed.sql import GovernedSQL, source_identity
+from tn_governed.values.catalog import AssignedRules
+from tn_governed.values.demo import handle
+from tn_governed.values.evidence import EvidenceRecorder
+from tn_governed.values.model import NativeModelEndpoint, digest, prepare_native_model
+from tn_governed.values.provision import provision
+from tn_governed.values.sql import GovernedSQL, source_identity
 from .frames import DataframeContext, DataframeGovernance, dataframe_calculate
 from .metrics import stage as profile_stage
 
@@ -67,7 +67,7 @@ def _error(exc, stage):
 def _adapter_sources(repository):
     """Identify the actual editable adapter and installed transport sources."""
     roots = {
-        "deepvest_tn": repository / "src/deepvest_tn",
+        "tn_governed": repository / "src/tn_governed",
         "tn_polars": Path(tn_polars.__file__).resolve().parent,
         "tn_llama_client": Path(tn_llama_client.__file__).resolve().parent,
     }
@@ -302,7 +302,7 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
                     for path in sorted(Path(__file__).parent.glob("*.py"))
                 }
                 source_hashes.update({
-                    "deepvest_tn/governed/" + path.name: digest(path)
+                    "tn_governed/values/" + path.name: digest(path)
                     for path in sorted(Path(governed.__file__).parent.glob("*.py"))
                 })
                 commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repository,
@@ -359,7 +359,7 @@ def run_case(root, mode, rows=1, depth=1, branches=1, model=False, claim=True,
                     }
                 write_once(root / "run.json", json.dumps(manifest, indent=2).encode())
         stage = "verification"
-        from deepvest_tn.governed.verify import verify
+        from tn_governed.values.verify import verify
         from .verify_frame import verify_frame
         try:
             with _timed(timings, stage):

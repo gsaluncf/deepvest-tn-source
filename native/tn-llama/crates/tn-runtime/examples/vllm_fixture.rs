@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = governed_support::Fixture::new();
     let root = fixture.legacy.temp.path();
     std::fs::write(root.join("runtime-config-v2.json"), &fixture.runtime_json)?;
-    std::fs::write(root.join("request-v2.json"), fixture.request("deepvest"))?;
+    std::fs::write(root.join("request-v2.json"), fixture.request("calculation"))?;
     std::fs::write(
         root.join("governed-manifest.json"),
         serde_json::to_vec_pretty(&fixture.manifest)?,

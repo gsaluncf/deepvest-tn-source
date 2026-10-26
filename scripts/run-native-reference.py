@@ -4,7 +4,7 @@ import argparse
 import os
 from pathlib import Path
 
-from deepvest_tn.native_run import run_native_reference
+from tn_governed.native_run import run_native_reference
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--run-directory", required=True, type=Path)

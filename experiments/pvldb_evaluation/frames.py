@@ -25,14 +25,14 @@ from tn_polars.registry import write_edition_bundle
 from tn_polars.support import Support
 from tn_polars.tn_boundary import PolicySet, TnBoundary, root_name
 
-from deepvest_tn.unity import FinanceEditionRequest, resolve_finance_editions
-from deepvest_tn.governed.catalog import ReceivedEdition, UnityGovernance, markdown
-from deepvest_tn.governed.evidence import EvidenceError
-from deepvest_tn.governed.numeric import TNNumeric
-from deepvest_tn.governed.numeric_codec import KINDS, record_value
+from tn_governed.unity import FinanceEditionRequest, resolve_finance_editions
+from tn_governed.values.catalog import ReceivedEdition, UnityGovernance, markdown
+from tn_governed.values.evidence import EvidenceError
+from tn_governed.values.numeric import TNNumeric
+from tn_governed.values.numeric_codec import KINDS, record_value
 from .numeric_profile import numeric_profile, polars_dtype, build_frame, check_fixed_plan_range
-from deepvest_tn.governed.primitives import Context, OPERATIONS
-from deepvest_tn.governed.string import OperationDenied, TNString, _active
+from tn_governed.values.primitives import Context, OPERATIONS
+from tn_governed.values.string import OperationDenied, TNString, _active
 
 
 OPERATION = "dataframe_calculate"

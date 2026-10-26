@@ -18,11 +18,11 @@ _CONTAINMENT_ENVIRONMENT = (
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="deepvest-tn")
+    parser = argparse.ArgumentParser(prog="tn-governed")
     commands = parser.add_subparsers(dest="command", required=True)
     native = commands.add_parser(
         "governed-path",
-        help="run signed editions through native TN, Polars, DeepVest and tn-llama",
+        help="run signed editions through native TN, Polars, calculations and tn-llama",
     )
     native.add_argument("--run-directory", required=True, type=Path)
     native.add_argument("--unity-url", default="http://127.0.0.1:8080")

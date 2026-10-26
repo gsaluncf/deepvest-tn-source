@@ -10,8 +10,8 @@ from contextlib import contextmanager
 import pytest
 import tn
 
-from deepvest_tn.publications import open_publication_store
-from deepvest_tn.sqlite_publications import SQLitePublicationStore
+from tn_governed.publications import open_publication_store
+from tn_governed.sqlite_publications import SQLitePublicationStore
 from test_publications import POLICY, publication
 
 
@@ -88,7 +88,7 @@ def test_record_batch_is_atomic_and_immutable(tmp_path):
 
 
 def test_failed_record_commit_does_not_advance_recorder_or_allow_computation(tmp_path, monkeypatch):
-    from deepvest_tn.governed import Assessment, Context, EvidenceRecorder, Request
+    from tn_governed.values import Assessment, Context, EvidenceRecorder, Request
 
     with SQLitePublicationStore(tmp_path) as store, tn.Session(POLICY, groups=["values", "evidence"]) as session:
         policy = session.policy("portfolio.feed.data.v1")
@@ -138,7 +138,7 @@ def test_process_crash_recovers_only_committed_records(tmp_path, commit):
     code = '''
 import os,sys,tn
 from pathlib import Path
-from deepvest_tn.sqlite_publications import SQLitePublicationStore
+from tn_governed.sqlite_publications import SQLitePublicationStore
 root=Path(sys.argv[1])
 class CrashStore(SQLitePublicationStore):
     def _insert_reference(self, *args):

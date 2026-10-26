@@ -15,8 +15,8 @@ import tn
 import yaml
 from tn_llama_client.clients import NativeOutputReader
 
-from deepvest_tn.llama import submit_governed_report
-from deepvest_tn.publications import write_once
+from tn_governed.llama import submit_governed_report
+from tn_governed.publications import write_once
 
 from .string import OperationDenied, _active
 

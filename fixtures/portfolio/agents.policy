@@ -4,13 +4,13 @@ schema: tn-agents-policy@v1
 ---
 # TN Agents Policy
 
-## portfolio.deepvest.calculated
+## portfolio.calculation.calculated
 
 ### instruction
 Use the governed portfolio inputs only to create the approved portfolio analysis and report row.
 
 ### use_for
-Internal portfolio analysis and reporting for the authorized DeepVest workflow.
+Internal portfolio analysis and reporting for the authorized portfolio workflow.
 
 ### do_not_use_for
 Trade execution, investment order placement, or external redistribution of account-level data.

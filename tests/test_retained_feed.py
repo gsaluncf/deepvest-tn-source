@@ -5,14 +5,14 @@ from threading import Thread
 import pytest
 from governed_edition_fixtures import signed_edition
 
-from deepvest_tn.feed_server import FeedServerConfig, create_feed_server
-from deepvest_tn.getdata import (
+from tn_governed.feed_server import FeedServerConfig, create_feed_server
+from tn_governed.getdata import (
     FeedFetchHTTPError,
     FeedFetchResponseError,
     GetDataConfig,
     fetch_governed_feed,
 )
-from deepvest_tn.publications import PublicationStore
+from tn_governed.publications import PublicationStore
 
 
 @contextmanager

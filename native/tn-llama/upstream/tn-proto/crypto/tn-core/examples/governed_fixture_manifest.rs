@@ -214,7 +214,7 @@ fn export() -> Result<Manifest> {
             "portfolio_analysis",
             "compare_editions",
         ),
-        ("deepvest", "deepvest", "portfolio_analysis", "calculate"),
+        ("calculation", "calculation", "portfolio_analysis", "calculate"),
         ("model", "tn-llama", "portfolio_analysis", "generate_report"),
         (
             "wrong_application",
@@ -294,7 +294,7 @@ fn export() -> Result<Manifest> {
                 vec![ContractBinding::new(&revision_id, "finance.wealth_path")?],
                 vec![
                     uses["source"].clone(),
-                    uses["deepvest"].clone(),
+                    uses["calculation"].clone(),
                     uses["model"].clone(),
                 ],
                 "grant:synthetic-m1",
@@ -332,12 +332,12 @@ fn export() -> Result<Manifest> {
         &mut joined_data,
         "finance.prepared",
         &uses["source"],
-        "deepvest",
+        "calculation",
         |_| Ok(true),
     )?;
     let mut calculation = reader.receive_for(
         joined.wire(),
-        &uses["deepvest"],
+        &uses["calculation"],
         ["finance"],
         None,
         |context| catalog.accepts(context, &dag),
@@ -350,10 +350,10 @@ fn export() -> Result<Manifest> {
         "arguments":{"wealth_path":[100,120,90,135]}, "result":0.25
     }, "synthetic":true}),
     )?;
-    let deepvest = writer.release_for(
+    let released_calculation = writer.release_for(
         &mut calculation,
-        "deepvest.calculation",
-        &uses["deepvest"],
+        "calculation.result",
+        &uses["calculation"],
         "tn-llama",
         |_| Ok(true),
     )?;
@@ -363,12 +363,12 @@ fn export() -> Result<Manifest> {
     let opened_joined = metadata(&reader, &joined, "finance")?;
     let lost_contract = writer.seal(
         opened_joined
-            .derive_under("deepvest.calculation", inputs[0].governance().clone())?
+            .derive_under("calculation.result", inputs[0].governance().clone())?
             .group("finance", json!({"result":0.25}))?,
     )?;
     let policies = calculation.policies()?;
     let mut unbound = DataObject::new(
-        "deepvest.calculation",
+        "calculation.result",
         policies[0].clone(),
         "finance",
         json!({"result":0.25}),
@@ -378,7 +378,7 @@ fn export() -> Result<Manifest> {
     }
     let lost_binding = writer.seal(
         opened_joined
-            .derive_under("deepvest.calculation", unbound.governance().clone())?
+            .derive_under("calculation.result", unbound.governance().clone())?
             .group("finance", json!({"result":0.25}))?,
     )?;
     let unreached = writer.seal(
@@ -386,13 +386,13 @@ fn export() -> Result<Manifest> {
             .group("finance", json!({"wealth_path":[100,120,90,135]}))?,
     )?;
     objects.insert("joined".into(), joined);
-    objects.insert("deepvest".into(), deepvest);
+    objects.insert("calculation".into(), released_calculation);
     objects.insert("lost_contract".into(), lost_contract);
     objects.insert("lost_binding".into(), lost_binding);
     objects.insert("unreached_origins".into(), unreached);
 
     let mut expected_releases = BTreeMap::new();
-    for name in ["joined", "deepvest"] {
+    for name in ["joined", "calculation"] {
         let object = &objects[name];
         let view = reader.governance(object)?;
         let proof = LineageVerifier::default().verify(&view, &catalog, &dag, |id| {
@@ -506,18 +506,18 @@ fn export() -> Result<Manifest> {
             Some("fixture callback error"),
         ),
         make_case(
-            "deepvest_receives_joined",
+            "calculation_receives_joined",
             "joined",
             None,
-            "deepvest",
+            "calculation",
             "accept",
             true,
             1,
             None,
         ),
         make_case(
-            "model_receives_exact_deepvest",
-            "deepvest",
+            "model_receives_exact_calculation",
+            "calculation",
             None,
             "model",
             "accept",
@@ -527,7 +527,7 @@ fn export() -> Result<Manifest> {
         ),
         make_case(
             "derived_wrong_use",
-            "deepvest",
+            "calculation",
             None,
             "wrong_application",
             "accept",

@@ -16,15 +16,15 @@ from tn_polars.builder import GovernedPolars
 from tn_polars.frame import GovernedLazyFrame
 from tn_polars.registry import _load_entry
 
-from deepvest_tn.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
-from deepvest_tn.getdata import FeedFetchFact
-from deepvest_tn.polars_stage import (
+from tn_governed.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
+from tn_governed.getdata import FeedFetchFact
+from tn_governed.polars_stage import (
     EmptyPortfolioSelection,
     GovernedPortfolioResult,
     run_governed_polars_stage,
     transform_position_market_values,
 )
-from deepvest_tn.unity import (
+from tn_governed.unity import (
     FEED_NAMES,
     MARKET_PRICES_FEED,
     POLICY_REF,
@@ -159,8 +159,8 @@ def test_production_stage_resolves_admits_and_materializes_exact_values(
         {"symbol": "VTI", "position_market_value": 65398.2},
     ]
     assert unity_transport.get_paths == [
-        "/volumes/deepvest.finance.deepvest_internal_positions",
-        "/volumes/deepvest.finance.deepvest_market_prices",
+        "/volumes/portfolio.finance.portfolio_internal_positions",
+        "/volumes/portfolio.finance.portfolio_market_prices",
     ]
 
 
@@ -239,7 +239,7 @@ def test_stage_resolves_both_governance_entries_before_the_first_data_request(
     finance_feed_service: tuple[str, Path],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import deepvest_tn.polars_stage as polars_stage
+    import tn_governed.polars_stage as polars_stage
 
     feed_url, _data_dir = finance_feed_service
     events: list[str] = []
@@ -269,7 +269,7 @@ def test_stage_resolves_both_governance_entries_before_the_first_data_request(
 def test_unity_resolution_failure_makes_zero_data_requests(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import deepvest_tn.polars_stage as polars_stage
+    import tn_governed.polars_stage as polars_stage
 
     calls: list[str] = []
 
@@ -543,8 +543,8 @@ def test_production_stage_does_not_cross_forbidden_boundaries(
     from tn_polars.registry import LocalRegistry
     from tn_polars.tn_envelopes import DeskLedger
 
-    import deepvest_tn.deepvest as deepvest_boundary
-    import deepvest_tn.polars_stage as polars_stage
+    import tn_governed.calculation as calculation_boundary
+    import tn_governed.polars_stage as polars_stage
 
     calls: list[str] = []
 
@@ -569,24 +569,24 @@ def test_production_stage_does_not_cross_forbidden_boundaries(
     monkeypatch.setattr(tn, "log", deny("tn.log"))
     monkeypatch.setattr(tn.TN, "log", deny("TN.log"))
     monkeypatch.setattr(
-        deepvest_boundary,
-        "build_deepvest_request",
-        deny("build_deepvest_request"),
+        calculation_boundary,
+        "build_portfolio_request",
+        deny("build_portfolio_request"),
     )
     monkeypatch.setattr(
-        deepvest_boundary,
-        "execute_deepvest",
-        deny("execute_deepvest"),
+        calculation_boundary,
+        "execute_portfolio_calculation",
+        deny("execute_portfolio_calculation"),
     )
     monkeypatch.setattr(
-        deepvest_boundary.StubDeepVest,
+        calculation_boundary.StubCalculationPort,
         "calculate",
-        deny("StubDeepVest.calculate"),
+        deny("StubCalculationPort.calculate"),
     )
     monkeypatch.setattr(
         polars_stage,
-        "execute_deepvest",
-        deny("polars_stage.execute_deepvest"),
+        "execute_portfolio_calculation",
+        deny("polars_stage.execute_portfolio_calculation"),
         raising=False,
     )
     monkeypatch.setattr(

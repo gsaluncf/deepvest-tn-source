@@ -7,7 +7,7 @@ use tn_runtime::ActionOutcome;
 #[test]
 fn independent_output_reader_failure_releases_no_wire() {
     let fixture = Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     std::fs::copy(
         fixture.config.reader_key_dir.join("tn.agents.btn.mykit"),
         fixture
@@ -56,7 +56,7 @@ fn v2_reuses_visible_and_unselected_attribution_gates() {
         ),
     ] {
         let mut fixture = Fixture::new();
-        let request = fixture.request("deepvest");
+        let request = fixture.request("calculation");
         let section = if selected { "finance" } else { "audit" };
         fixture
             .config
@@ -95,7 +95,7 @@ fn v2_reuses_visible_and_unselected_attribution_gates() {
 fn configured_report_revision_is_attached_without_replacing_inherited_policies() {
     use tn_core::governed::{ContractBinding, Governance, PolicyRevisionDraft};
     let mut fixture = Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     let output_path = fixture.config.output_tn_config_path.clone();
     let profile = fixture.config.governed_objects.as_mut().unwrap();
     let source = tn_core::runtime::Objects::open(&profile.native_reader_config_path).unwrap();
@@ -167,9 +167,9 @@ fn configured_report_revision_is_attached_without_replacing_inherited_policies()
 #[test]
 fn native_report_retains_both_contracts_bindings_and_exact_parent() {
     let fixture = Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     let source = tn_core::governed::GovernedObject::parse(
-        fixture.manifest["publications"]["deepvest"]["wire"]
+        fixture.manifest["publications"]["calculation"]["wire"]
             .as_str()
             .unwrap(),
     )
@@ -233,7 +233,7 @@ fn native_report_retains_both_contracts_bindings_and_exact_parent() {
 #[test]
 fn model_cannot_supply_governance_or_lineage() {
     let fixture = Fixture::new();
-    let request = fixture.request("deepvest");
+    let request = fixture.request("calculation");
     let (_keys, runtime) = fixture.runtime();
     let mut session = runtime.start_session(&request).unwrap();
     get_governance(&mut session).unwrap();

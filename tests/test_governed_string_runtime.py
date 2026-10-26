@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 import tn
 
-from deepvest_tn.publications import PublicationStore
+from tn_governed.publications import PublicationStore
 
 
 POLICY = """## experiment.string
@@ -36,8 +36,8 @@ Refuse unverified evidence.
 
 @pytest.fixture
 def env(tmp_path):
-    from deepvest_tn.governed import EvidenceRecorder, Rules, publish_source
-    from deepvest_tn.governed.runtime import Context
+    from tn_governed.values import EvidenceRecorder, Rules, publish_source
+    from tn_governed.values.runtime import Context
 
     with tn.Session(POLICY, groups=["strings", "evidence"]) as session:
         store = PublicationStore(tmp_path / "publications")
@@ -54,7 +54,7 @@ def env(tmp_path):
 
 
 def records(context):
-    from deepvest_tn.governed import verify_tape
+    from tn_governed.values import verify_tape
 
     return verify_tape(
         context.recorder.records(), session=context.session,
@@ -65,7 +65,7 @@ def records(context):
 
 
 def test_compute_can_succeed_when_exposure_is_refused(env):
-    from deepvest_tn.governed import OperationDenied, TNString
+    from tn_governed.values import OperationDenied, TNString
 
     context, values, rules = env
     context.evaluator = replace(rules, destinations=frozenset())
@@ -86,7 +86,7 @@ def test_compute_can_succeed_when_exposure_is_refused(env):
 
 
 def test_denial_and_failed_obligation_never_open_business_data(env, monkeypatch):
-    from deepvest_tn.governed import Assessment, ObligationResult, OperationDenied
+    from tn_governed.values import Assessment, ObligationResult, OperationDenied
 
     context, values, _ = env
     opened = []
@@ -105,7 +105,7 @@ def test_denial_and_failed_obligation_never_open_business_data(env, monkeypatch)
 
 
 def test_obligation_completes_and_decision_is_durable_before_open(env, monkeypatch):
-    from deepvest_tn.governed import Assessment, ObligationResult
+    from tn_governed.values import Assessment, ObligationResult
 
     context, values, _ = env
     order = []
@@ -148,7 +148,7 @@ def test_concat_preserves_claim_issuer_and_original_subjects(env):
 
 
 def test_copy_records_its_source_and_gated_str_uses_destination(env):
-    from deepvest_tn.governed import OperationDenied
+    from tn_governed.values import OperationDenied
 
     context, values, _ = env
     with pytest.raises(OperationDenied):
@@ -187,7 +187,7 @@ def test_recording_failure_never_returns_plaintext_or_runs_compute(env, monkeypa
 
 
 def test_record_chain_rejects_tampering_truncation_and_wrong_writer(env):
-    from deepvest_tn.governed import EvidenceError, verify_tape
+    from tn_governed.values import EvidenceError, verify_tape
 
     context, values, _ = env
     with context:
@@ -214,7 +214,7 @@ def test_record_chain_rejects_tampering_truncation_and_wrong_writer(env):
 
 
 def test_forged_result_citation_and_invalid_outcomes_are_refused(env):
-    from deepvest_tn.governed import EvidenceError, OperationDenied, TNString
+    from tn_governed.values import EvidenceError, OperationDenied, TNString
 
     context, values, _ = env
     with context:

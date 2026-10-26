@@ -16,4 +16,4 @@ $paths = @(
 )
 $env:PYTHONPATH = ($paths + @($env:PYTHONPATH | Where-Object { $_ })).Where({ $_ }) -join [IO.Path]::PathSeparator
 
-python -c "import polars as pl; print('DeepVest-TN experiment environment active; Polars', pl.__version__)"
+python -c "import polars as pl; print('TN governed workflow experiment environment active; Polars', pl.__version__)"

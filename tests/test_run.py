@@ -28,11 +28,11 @@ from tn_llama_client.protocol import ReportRelease
 from tn_polars.admission import SchemaPinViolation
 from tn_polars.release import PolicyDenied
 
-from deepvest_tn import cli as cli_module
-from deepvest_tn import run as run_module
-from deepvest_tn.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
-from deepvest_tn.getdata import FeedFetchHTTPError, FeedFetchResponseError, FetchedFeed
-from deepvest_tn.run import (
+from tn_governed import cli as cli_module
+from tn_governed import run as run_module
+from tn_governed.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
+from tn_governed.getdata import FeedFetchHTTPError, FeedFetchResponseError, FetchedFeed
+from tn_governed.run import (
     PortfolioDemoConfig,
     PortfolioDemoResult,
     GovernedServerSpec,
@@ -40,8 +40,8 @@ from deepvest_tn.run import (
     run_portfolio_demo,
     run_reference_path,
 )
-from deepvest_tn.tn_flow import TNFlowResult
-from deepvest_tn.unity import (
+from tn_governed.tn_flow import TNFlowResult
+from tn_governed.unity import (
     FEED_NAMES,
     MARKET_PRICES_FEED,
     POSITIONS_FEED,
@@ -54,7 +54,7 @@ _ACTIVE_FEED_URL = ""
 
 def test_report_prompt_pins_the_mandatory_disclosure_as_the_final_paragraph() -> None:
     fixed_narrative = (
-        "This report contains supplied portfolio positions and DeepVest stub risk metrics. "
+        "This report contains supplied portfolio positions and fixed risk metrics. "
         "The metrics and narrative are fixed."
     )
     disclosure_paragraph = f"<p>{run_module._STUB_DISCLOSURE}</p>"
@@ -157,8 +157,8 @@ def _canonical_release_body(flow: TNFlowResult) -> bytes:
         f"{template.path}#{template.event_type}@{template.version}#{template.content_hash}"
     )
     report_html = (
-        "<p>DeepVest calculations in this report are deterministic "
-        "stub outputs, not live DeepVest results.</p>"
+        "<p>The calculations in this report are deterministic "
+        "stub outputs, not live calculation results.</p>"
     )
     emitted = writer.log(
         "report.generated",
@@ -168,7 +168,7 @@ def _canonical_release_body(flow: TNFlowResult) -> bytes:
         source_lineage={
             "source_device_identity": flow.source_row.source_writer_did,
             "source_event_id": flow.source_row.event_id,
-            "source_event_type": "portfolio.deepvest.calculated",
+            "source_event_type": "portfolio.calculation.calculated",
             "derived_from_row_hash": flow.source_row.row_hash,
             "source_policy": flow.source_row.policy_reference,
             "selected_sections": ["finance"],
@@ -353,7 +353,7 @@ def test_reference_run_executes_the_tn_object_path_through_the_governed_route(
     assert request["tn_row"] == dict(captured["flow"].source_row.envelope)
     summary = json.loads(result.summary_path.read_text(encoding="utf-8"))
     assert summary["getdata"]["representation"] == "application/vnd.tn+json"
-    assert summary["deepvest"]["live"] is False
+    assert summary["calculation"]["live"] is False
     assert summary["tn_llama"]["route"] == "/v1/tn/chat/completions"
 
 
@@ -377,7 +377,7 @@ def test_portfolio_demo_composes_real_stages_and_saves_only_recipient_opened_out
     handoff: dict[str, object] = {}
 
     real_polars = run_module.run_governed_polars_stage
-    real_deepvest = run_module.execute_deepvest
+    real_calculation = run_module.execute_portfolio_calculation
     real_tn = run_module.provision_tn_flow
     real_config = run_module.write_finance_runtime_config
     real_submit = run_module.submit_finance_report
@@ -387,9 +387,9 @@ def test_portfolio_demo_composes_real_stages_and_saves_only_recipient_opened_out
         events.append("polars")
         return real_polars(*args, **kwargs)
 
-    def observed_deepvest(*args, **kwargs):
-        events.append("deepvest")
-        return real_deepvest(*args, **kwargs)
+    def observed_calculation(*args, **kwargs):
+        events.append("calculation")
+        return real_calculation(*args, **kwargs)
 
     def observed_tn(*args, **kwargs):
         events.append("tn")
@@ -414,7 +414,7 @@ def test_portfolio_demo_composes_real_stages_and_saves_only_recipient_opened_out
         return real_summary(path, document)
 
     monkeypatch.setattr(run_module, "run_governed_polars_stage", observed_polars)
-    monkeypatch.setattr(run_module, "execute_deepvest", observed_deepvest)
+    monkeypatch.setattr(run_module, "execute_portfolio_calculation", observed_calculation)
     monkeypatch.setattr(run_module, "provision_tn_flow", observed_tn)
     monkeypatch.setattr(run_module, "write_finance_runtime_config", observed_config)
     monkeypatch.setattr(run_module, "submit_finance_report", observed_submit)
@@ -451,7 +451,7 @@ def test_portfolio_demo_composes_real_stages_and_saves_only_recipient_opened_out
     assert result.summary_path == run_directory / "run-summary.json"
     assert events == [
         "polars",
-        "deepvest",
+        "calculation",
         "tn",
         "runtime_config",
         "server_enter",
@@ -461,8 +461,8 @@ def test_portfolio_demo_composes_real_stages_and_saves_only_recipient_opened_out
         "server_exit",
     ]
     assert unity.get_paths == [
-        "/volumes/deepvest.finance.deepvest_internal_positions",
-        "/volumes/deepvest.finance.deepvest_market_prices",
+        "/volumes/portfolio.finance.portfolio_internal_positions",
+        "/volumes/portfolio.finance.portfolio_market_prices",
     ]
 
     requests = handoff["requests"]
@@ -474,8 +474,8 @@ def test_portfolio_demo_composes_real_stages_and_saves_only_recipient_opened_out
     assert request_body["tn_row"] == dict(flow.source_row.envelope)
     assert "only the finance section" in request_body["messages"][0]["content"]
     assert (
-        "DeepVest calculations in this report are deterministic stub outputs, "
-        "not live DeepVest results."
+        "The calculations in this report are deterministic stub outputs, "
+        "not live calculation results."
     ) in request_body["messages"][0]["content"]
 
     server_spec = handoff["server_spec"]
@@ -545,7 +545,7 @@ def test_portfolio_demo_composes_real_stages_and_saves_only_recipient_opened_out
             },
             "row_selection_sources": ["account_id", "currency", "symbol"],
         },
-        "deepvest": {
+        "calculation": {
             "provider": "stub",
             "live": False,
             "invocation_count": 1,
@@ -563,7 +563,7 @@ def test_portfolio_demo_composes_real_stages_and_saves_only_recipient_opened_out
             "data_specific_generation_claimed": False,
         },
         "tn_source": {
-            "event_type": "portfolio.deepvest.calculated",
+            "event_type": "portfolio.calculation.calculated",
             "event_id": flow.source_row.event_id,
             "row_hash": flow.source_row.row_hash,
             "encrypted_groups": ["finance", "tn.agents"],
@@ -584,7 +584,7 @@ def test_portfolio_demo_composes_real_stages_and_saves_only_recipient_opened_out
     for prohibited in (
         api_key,
         "portfolio_values",
-        "deepvest_result",
+        "calculation_result",
         "controls_passed",
         "answer_statuses",
         '"q1"',
@@ -667,7 +667,7 @@ def test_portfolio_demo_scopes_no_bytecode_and_tn_environment_then_restores_it(
     assert {name: os.environ.get(name) for name in names} == original
 
 
-def test_unavailable_getdata_stops_before_deepvest_or_tn(
+def test_unavailable_getdata_stops_before_calculation_or_tn(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
@@ -684,7 +684,7 @@ def test_unavailable_getdata_stops_before_deepvest_or_tn(
 
         return denied
 
-    monkeypatch.setattr(run_module, "execute_deepvest", unexpected("deepvest"))
+    monkeypatch.setattr(run_module, "execute_portfolio_calculation", unexpected("calculation"))
     monkeypatch.setattr(run_module, "provision_tn_flow", unexpected("tn"))
 
     with pytest.raises(FeedFetchHTTPError):
@@ -703,14 +703,14 @@ def test_unavailable_getdata_stops_before_deepvest_or_tn(
         ("media", FeedFetchResponseError),
     ],
 )
-def test_pre_deepvest_getdata_denials_never_reach_deepvest_or_tn(
+def test_pre_calculation_getdata_denials_never_reach_calculation_or_tn(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
     failure: str,
     expected_error: type[Exception],
 ) -> None:
-    import deepvest_tn.polars_stage as polars_stage
+    import tn_governed.polars_stage as polars_stage
 
     _project_root, config = _portfolio_demo_case(tmp_path, monkeypatch, name=f"getdata-{failure}")
     _install_unity_transport(monkeypatch, finance_bundles, base_url=config.unity_url)
@@ -745,7 +745,7 @@ def test_pre_deepvest_getdata_denials_never_reach_deepvest_or_tn(
         return boundary
 
     monkeypatch.setattr(polars_stage, "fetch_feed", fetch)
-    monkeypatch.setattr(run_module, "execute_deepvest", forbidden("deepvest"))
+    monkeypatch.setattr(run_module, "execute_portfolio_calculation", forbidden("calculation"))
     monkeypatch.setattr(run_module, "provision_tn_flow", forbidden("tn"))
 
     with pytest.raises(expected_error):
@@ -783,11 +783,11 @@ def test_tn_root_link_is_refused_before_provisioning_or_outside_mutation(
     _install_unity_transport(monkeypatch, finance_bundles, base_url=config.unity_url)
     outside = tmp_path / "outside-tn"
     outside.mkdir()
-    real_deepvest = run_module.execute_deepvest
+    real_calculation = run_module.execute_portfolio_calculation
     provision_calls: list[object] = []
 
-    def create_link_after_deepvest(*args, **kwargs):
-        execution = real_deepvest(*args, **kwargs)
+    def create_link_after_calculation(*args, **kwargs):
+        execution = real_calculation(*args, **kwargs)
         try:
             (config.run_directory / "tn").symlink_to(outside, target_is_directory=True)
         except OSError as error:
@@ -798,7 +798,7 @@ def test_tn_root_link_is_refused_before_provisioning_or_outside_mutation(
         provision_calls.append(object())
         raise AssertionError("Governed provisioning must not receive an escaped path")
 
-    monkeypatch.setattr(run_module, "execute_deepvest", create_link_after_deepvest)
+    monkeypatch.setattr(run_module, "execute_portfolio_calculation", create_link_after_calculation)
     monkeypatch.setattr(run_module, "provision_tn_flow", unexpected_provision)
 
     with pytest.raises(ValueError, match="outside the run directory"):
@@ -810,7 +810,7 @@ def test_tn_root_link_is_refused_before_provisioning_or_outside_mutation(
 
 
 @pytest.mark.parametrize("failure", ("unavailable", "incomplete"))
-def test_unity_failure_stops_before_deepvest_tn_server_and_release(
+def test_unity_failure_stops_before_tn_governed_server_and_release(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
@@ -847,10 +847,10 @@ def test_unity_failure_stops_before_deepvest_tn_server_and_release(
         expected_error = PolicyDenied
 
     monkeypatch.setattr(
-        run_module.StubDeepVest,
+        run_module.StubCalculationPort,
         "calculate",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("DeepVest must not run")
+            AssertionError("Calculation must not run")
         ),
     )
     monkeypatch.setattr(
@@ -874,7 +874,7 @@ def test_unity_failure_stops_before_deepvest_tn_server_and_release(
 
 
 @pytest.mark.parametrize("failure", ("schema", "governance"))
-def test_admission_or_governance_failure_stops_before_deepvest_and_tn(
+def test_admission_or_governance_failure_stops_before_calculation_and_tn(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
@@ -919,15 +919,15 @@ def test_admission_or_governance_failure_stops_before_deepvest_and_tn(
     )
     calls: list[str] = []
 
-    def forbidden_deepvest(*_args, **_kwargs):
-        calls.append("deepvest")
-        raise AssertionError("DeepVest must not run")
+    def forbidden_calculation(*_args, **_kwargs):
+        calls.append("calculation")
+        raise AssertionError("Calculation must not run")
 
     def forbidden_tn(*_args, **_kwargs):
         calls.append("tn")
         raise AssertionError("TN must not run")
 
-    monkeypatch.setattr(run_module.StubDeepVest, "calculate", forbidden_deepvest)
+    monkeypatch.setattr(run_module.StubCalculationPort, "calculate", forbidden_calculation)
     monkeypatch.setattr(run_module, "provision_tn_flow", forbidden_tn)
 
     try:
@@ -946,7 +946,7 @@ def test_admission_or_governance_failure_stops_before_deepvest_and_tn(
     _assert_no_released_outputs(config.run_directory)
 
 
-def test_deepvest_exception_is_attempted_once_and_stops_before_tn_or_network(
+def test_calculation_exception_is_attempted_once_and_stops_before_tn_or_network(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
@@ -954,7 +954,7 @@ def test_deepvest_exception_is_attempted_once_and_stops_before_tn_or_network(
     _project_root, config = _portfolio_demo_case(
         tmp_path,
         monkeypatch,
-        name="deepvest-failure",
+        name="calculation-failure",
     )
     _install_unity_transport(monkeypatch, finance_bundles, base_url=config.unity_url)
     attempts: list[object] = []
@@ -963,7 +963,7 @@ def test_deepvest_exception_is_attempted_once_and_stops_before_tn_or_network(
         attempts.append(request)
         raise RuntimeError("stub boundary failure")
 
-    monkeypatch.setattr(run_module.StubDeepVest, "calculate", raising_stub)
+    monkeypatch.setattr(run_module.StubCalculationPort, "calculate", raising_stub)
     monkeypatch.setattr(
         run_module,
         "provision_tn_flow",
@@ -1788,24 +1788,28 @@ def test_cli_refuses_missing_key_and_has_no_api_key_argument(
 def test_powershell_wrapper_uses_project_command_and_restores_absent_environment(
     tmp_path: Path,
 ) -> None:
+    from pip._vendor.distlib.scripts import ScriptMaker
+
     real_project = Path(__file__).resolve().parents[1]
     real_wrapper = real_project / "scripts" / "run-portfolio-demo.ps1"
-    real_command = Path(sys.executable).parent / "deepvest-tn.exe"
-    assert real_command.is_file()
 
     workspace = tmp_path / "workspace"
     project = workspace / "application"
     wrapper = project / "scripts" / "run-portfolio-demo.ps1"
-    project_command = project / ".venv" / "Scripts" / "deepvest-tn.exe"
+    project_command = project / ".venv" / "Scripts" / "tn-governed.exe"
     wrapper.parent.mkdir(parents=True)
     project_command.parent.mkdir(parents=True)
     (project / "dependencies" / "tn-polars").mkdir(parents=True)
     (project / "dependencies" / "tn-llama-client").mkdir(parents=True)
     shutil.copy2(real_wrapper, wrapper)
-    shutil.copy2(real_command, project_command)
+    launcher = ScriptMaker(None, str(project_command.parent))
+    launcher.executable = sys.executable
+    launcher.variants = {""}
+    launcher.make("tn-governed = tn_governed.cli:main")
+    assert project_command.is_file()
 
     shim_root = project / "src"
-    shim_package = shim_root / "deepvest_tn"
+    shim_package = shim_root / "tn_governed"
     shim_package.mkdir(parents=True)
     (shim_package / "__init__.py").write_text("", encoding="utf-8")
     (shim_package / "cli.py").write_text(
@@ -1840,7 +1844,7 @@ def test_powershell_wrapper_uses_project_command_and_restores_absent_environment
     fake_bin.mkdir()
     path_marker = tmp_path / "path-command-ran.txt"
     path_secret = tmp_path / "path-command-secret.txt"
-    fake_command = fake_bin / "deepvest-tn.cmd"
+    fake_command = fake_bin / "tn-governed.cmd"
     fake_command.write_text(
         "@echo off\n"
         "> \"%WRAPPER_TEST_PATH_MARKER%\" echo RAN\n"
@@ -2066,7 +2070,7 @@ def test_start_local_getdata_kills_an_unready_owned_child_and_releases_its_port(
     project_root = getdata_launcher_project
     script = project_root / "scripts" / "start-local-getdata.ps1"
     port = _free_port()
-    fake_root = tmp_path / "fake-package" / "deepvest_tn"
+    fake_root = tmp_path / "fake-package" / "tn_governed"
     fake_root.mkdir(parents=True)
     (fake_root / "__init__.py").write_text("", encoding="utf-8")
     (fake_root / "feed_server.py").write_text(

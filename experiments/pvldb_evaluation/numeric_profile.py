@@ -3,7 +3,7 @@
 from decimal import Decimal
 import polars as pl
 
-from deepvest_tn.governed.numeric_codec import encode
+from tn_governed.values.numeric_codec import encode
 
 
 def numeric_profile(kind, precision=38, scale=None):

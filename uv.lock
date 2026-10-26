@@ -155,7 +155,7 @@ wheels = [
 ]
 
 [[package]]
-name = "deepvest-tn"
+name = "tn-governed"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

@@ -75,7 +75,7 @@ fn release_carries_explicit_use_without_changing_parent_identity() {
             &mut data,
             "finance.result",
             &use_context,
-            "deepvest",
+            "calculation",
             |ctx| {
                 assert_eq!(ctx.use_context(), Some(&use_context));
                 assert_eq!(ctx.purpose(), "portfolio_analysis");
@@ -88,7 +88,7 @@ fn release_carries_explicit_use_without_changing_parent_identity() {
         view.governance().get("release_context"),
         Some(&json!({
             "application": "analytics", "purpose": "portfolio_analysis",
-            "operation": "release_calculation", "destination": "deepvest"
+            "operation": "release_calculation", "destination": "calculation"
         }))
     );
     assert!(view.governance().source_references().unwrap()[0].references(&parent));
@@ -118,7 +118,7 @@ fn refused_release_and_independent_copy_preserve_original_state() {
             &mut original,
             "finance.result",
             &use_context,
-            "deepvest",
+            "calculation",
             |_| Ok(false)
         )
         .is_err());
@@ -135,7 +135,7 @@ fn lineage_follows_exact_parents_and_rejects_contract_loss_and_wrong_resolution(
         .unwrap();
     let parent = data.snapshot().unwrap().clone();
     let output = session
-        .release(&mut data, "finance.result", "analysis", "deepvest", |_| {
+        .release(&mut data, "finance.result", "analysis", "calculation", |_| {
             Ok(true)
         })
         .unwrap();

@@ -1,4 +1,4 @@
-"""DeepVest calculation interface for governed portfolio data."""
+"""Calculation interface for governed portfolio data."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import tn
 
-from .deepvest_engine import CalculationRequest, CalculationResult
+from .calculation_client import CalculationRequest, CalculationResult
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,7 @@ class CalculationExecution:
     result: CalculationResult
 
 
-def execute_deepvest_tn(
+def execute_calculation(
     port,
     source: tn.GovernedObject | str | bytes,
     *,
@@ -68,7 +68,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
-class DeepVestPosition:
+class PortfolioPosition:
     """One allowlisted governed position supplied to the calculation boundary."""
 
     portfolio_id: str
@@ -83,14 +83,14 @@ class DeepVestPosition:
 
 
 @dataclass(frozen=True)
-class DeepVestRequest:
-    """Ordered immutable portfolio input for a DeepVest calculation adapter."""
+class PortfolioRequest:
+    """Ordered immutable portfolio input for a calculation adapter."""
 
-    positions: tuple[DeepVestPosition, ...]
+    positions: tuple[PortfolioPosition, ...]
 
 
 @dataclass(frozen=True)
-class DeepVestMetric:
+class CalculationMetric:
     """One normalized metric returned by the calculation boundary."""
 
     name: str
@@ -99,29 +99,29 @@ class DeepVestMetric:
 
 
 @dataclass(frozen=True)
-class DeepVestResult:
-    """Normalized application-domain result from a DeepVest port."""
+class PortfolioResult:
+    """Normalized application-domain result from a calculation port."""
 
     calculation_id: str
     analysis_type: str
-    metrics: tuple[DeepVestMetric, ...]
+    metrics: tuple[CalculationMetric, ...]
     provider: str
     live: bool
 
 
 @dataclass(frozen=True)
-class DeepVestExecution:
-    """Exact immutable request/result exchange at the DeepVest boundary."""
+class PortfolioExecution:
+    """Exact immutable request/result exchange at the calculation boundary."""
 
-    request: DeepVestRequest
-    result: DeepVestResult
+    request: PortfolioRequest
+    result: PortfolioResult
 
 
 @runtime_checkable
-class DeepVestPort(Protocol):
+class CalculationPort(Protocol):
     """Calculation interface shared by fixed-output and engine-backed adapters."""
 
-    def calculate(self, request: DeepVestRequest) -> DeepVestResult:
+    def calculate(self, request: PortfolioRequest) -> PortfolioResult:
         """Calculate the typed portfolio request."""
         ...
 
@@ -138,31 +138,31 @@ _POSITION_FIELDS = (
     "market_source",
 )
 _COMMON_CONTEXT_FIELDS = ("portfolio_id", "currency", "as_of")
-_STUB_RESULT = DeepVestResult(
+_STUB_RESULT = PortfolioResult(
     calculation_id="stub-portfolio-risk-001",
     analysis_type="portfolio_risk",
     metrics=(
-        DeepVestMetric("value_at_risk_95", 12500.0, "USD"),
-        DeepVestMetric("expected_shortfall_95", 16800.0, "USD"),
-        DeepVestMetric("maximum_drawdown", -0.18, "ratio"),
+        CalculationMetric("value_at_risk_95", 12500.0, "USD"),
+        CalculationMetric("expected_shortfall_95", 16800.0, "USD"),
+        CalculationMetric("maximum_drawdown", -0.18, "ratio"),
     ),
     provider="stub",
     live=False,
 )
 
 
-def build_deepvest_request(portfolio: GovernedPortfolioResult) -> DeepVestRequest:
+def build_portfolio_request(portfolio: GovernedPortfolioResult) -> PortfolioRequest:
     """Copy the allowlisted governed values into the immutable port contract."""
     values = portfolio.values
     if values.is_empty():
-        raise ValueError("cannot build a DeepVest request from an empty portfolio")
+        raise ValueError("cannot build a calculation request from an empty portfolio")
 
     for field in _COMMON_CONTEXT_FIELDS:
         if values.get_column(field).n_unique() != 1:
-            raise ValueError(f"DeepVest request contains mixed {field} values")
+            raise ValueError(f"Calculation request contains mixed {field} values")
 
     positions = tuple(
-        DeepVestPosition(
+        PortfolioPosition(
             portfolio_id=str(row["portfolio_id"]),
             symbol=str(row["symbol"]),
             quantity=int(row["quantity"]),
@@ -175,66 +175,66 @@ def build_deepvest_request(portfolio: GovernedPortfolioResult) -> DeepVestReques
         )
         for row in values.select(*_POSITION_FIELDS).iter_rows(named=True)
     )
-    return DeepVestRequest(positions=positions)
+    return PortfolioRequest(positions=positions)
 
 
-def execute_deepvest(
-    port: DeepVestPort,
+def execute_portfolio_calculation(
+    port: CalculationPort,
     portfolio: GovernedPortfolioResult,
-) -> DeepVestExecution:
+) -> PortfolioExecution:
     """Invoke the injected calculation port once with no retry or fallback."""
-    request = build_deepvest_request(portfolio)
+    request = build_portfolio_request(portfolio)
     result = port.calculate(request)
-    return DeepVestExecution(request=request, result=result)
+    return PortfolioExecution(request=request, result=result)
 
 
-class StubDeepVest:
+class StubCalculationPort:
     """Calculation adapter returning synthetic fixed metrics."""
 
     def __init__(self) -> None:
-        self._invocations: list[DeepVestRequest] = []
+        self._invocations: list[PortfolioRequest] = []
 
     @property
-    def invocations(self) -> tuple[DeepVestRequest, ...]:
+    def invocations(self) -> tuple[PortfolioRequest, ...]:
         """Return an immutable record of every exact request received."""
         return tuple(self._invocations)
 
-    def calculate(self, request: DeepVestRequest) -> DeepVestResult:
+    def calculate(self, request: PortfolioRequest) -> PortfolioResult:
         """Record the request and return the fixed non-live transport fixture."""
         self._invocations.append(request)
         return _STUB_RESULT
 
 
-def execute_deepvest_tn_legacy(
-    port: DeepVestPort,
+def execute_sealed_calculation(
+    port: CalculationPort,
     source: tn.SealedObject | Mapping[str, object] | str | bytes | Path,
     *,
     recipient_config_path: Path,
     publisher_config_path: Path,
-) -> tuple[DeepVestExecution, tn.SealedObject]:
+) -> tuple[PortfolioExecution, tn.SealedObject]:
     """Open the Polars TN object, calculate once, and seal the governed result."""
     from .tn_objects import seal_governed_object
 
-    opened, execution = _open_and_execute_deepvest_tn(
+    opened, execution = _open_and_execute_sealed_calculation(
         port,
         source,
         recipient_config_path=recipient_config_path,
     )
     sealed = seal_governed_object(
         publisher_config_path,
-        "portfolio.deepvest.calculated",
+        "portfolio.calculation.calculated",
         business_group="finance",
         business_fields={
             "portfolio_values": opened.business["portfolio_values"],
-            "deepvest_result": asdict(execution.result),
+            "calculation_result": asdict(execution.result),
         },
         governance=opened.governance,
     )
     return execution, sealed
 
 
-def _open_and_execute_deepvest_tn(
-    port: DeepVestPort,
+def _open_and_execute_sealed_calculation(
+    port: CalculationPort,
     source: tn.SealedObject | Mapping[str, object] | str | bytes | Path,
     *,
     recipient_config_path: Path,
@@ -251,9 +251,9 @@ def _open_and_execute_deepvest_tn(
     if not isinstance(rows, list) or not rows or not all(isinstance(row, Mapping) for row in rows):
         raise ValueError("Polars TN object must contain nonempty portfolio_values")
 
-    request = DeepVestRequest(
+    request = PortfolioRequest(
         positions=tuple(
-            DeepVestPosition(
+            PortfolioPosition(
                 portfolio_id=str(row["portfolio_id"]),
                 symbol=str(row["symbol"]),
                 quantity=int(row["quantity"]),
@@ -268,41 +268,41 @@ def _open_and_execute_deepvest_tn(
         )
     )
     result = port.calculate(request)
-    execution = DeepVestExecution(request=request, result=result)
+    execution = PortfolioExecution(request=request, result=result)
     return opened, execution
 
 
-def execute_deepvest_tn_for_llama(
-    port: DeepVestPort,
+def execute_calculation_for_model(
+    port: CalculationPort,
     source: tn.SealedObject | Mapping[str, object] | str | bytes | Path,
     *,
     recipient_config_path: Path,
     publisher_config_path: Path,
 ):
-    """Execute DeepVest and publish both canonical TN forms before leaving the endpoint."""
-    from .tn_flow import publish_deepvest_values_for_llama
+    """Run the calculation and publish both canonical TN forms before leaving the endpoint."""
+    from .tn_flow import publish_calculation_values_for_model
     from .tn_objects import seal_governed_object
 
-    opened, execution = _open_and_execute_deepvest_tn(
+    opened, execution = _open_and_execute_sealed_calculation(
         port,
         source,
         recipient_config_path=recipient_config_path,
     )
     portfolio_values = opened.business["portfolio_values"]
-    deepvest_result = asdict(execution.result)
+    calculation_result = asdict(execution.result)
     sealed = seal_governed_object(
         publisher_config_path,
-        "portfolio.deepvest.calculated",
+        "portfolio.calculation.calculated",
         business_group="finance",
         business_fields={
             "portfolio_values": portfolio_values,
-            "deepvest_result": deepvest_result,
+            "calculation_result": calculation_result,
         },
         governance=opened.governance,
     )
-    model_row = publish_deepvest_values_for_llama(
+    model_row = publish_calculation_values_for_model(
         portfolio_values=portfolio_values,
-        deepvest_result=deepvest_result,
+        calculation_result=calculation_result,
         governance=opened.governance,
         publisher_config_path=publisher_config_path,
     )

@@ -17,8 +17,8 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from deepvest_tn.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
-from deepvest_tn.getdata import (
+from tn_governed.feed_server import FeedServerConfig, create_feed_server, seed_finance_feed_data
+from tn_governed.getdata import (
     FeedFetchHTTPError,
     FeedFetchResponseError,
     GetDataConfig,
@@ -82,8 +82,8 @@ def test_seeding_copies_only_the_two_fixture_files(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("feed_name", "expected_rows"),
     [
-        ("deepvest.internal.positions", POSITIONS_ROWS),
-        ("deepvest.market.prices", PRICES_ROWS),
+        ("portfolio.internal.positions", POSITIONS_ROWS),
+        ("portfolio.market.prices", PRICES_ROWS),
     ],
 )
 def test_exact_feed_route_returns_raw_rows_and_client_fact(
@@ -93,8 +93,8 @@ def test_exact_feed_route_returns_raw_rows_and_client_fact(
 ) -> None:
     base_url, events, runtime_data = feed_service
     filename = {
-        "deepvest.internal.positions": "internal_positions.ndjson",
-        "deepvest.market.prices": "market_prices.ndjson",
+        "portfolio.internal.positions": "internal_positions.ndjson",
+        "portfolio.market.prices": "market_prices.ndjson",
     }[feed_name]
     stored_bytes = (runtime_data / filename).read_bytes()
     assert stored_bytes.splitlines() == expected_rows.splitlines()
@@ -163,7 +163,7 @@ def test_post_to_unknown_or_encoded_traversal_route_returns_not_found(
 
 @pytest.mark.parametrize(
     "feed_name",
-    ["deepvest.internal.positions", "deepvest.market.prices"],
+    ["portfolio.internal.positions", "portfolio.market.prices"],
 )
 def test_post_to_exact_data_route_is_not_allowed(
     feed_service: tuple[str, io.StringIO, Path], feed_name: str
@@ -211,7 +211,7 @@ def test_module_entry_point_seeds_and_serves_the_requested_port(tmp_path: Path) 
         [
             sys.executable,
             "-m",
-            "deepvest_tn.feed_server",
+            "tn_governed.feed_server",
             "--port",
             str(requested_port),
             "--data-directory",
@@ -285,6 +285,6 @@ def test_client_rejects_invalid_http_response(
     server = ThreadingHTTPServer(("127.0.0.1", 0), FixedResponseHandler)
 
     with running_server(server) as base_url, pytest.raises(exception_type, match=message):
-        fetch_feed(GetDataConfig(base_url=base_url), "deepvest.internal.positions")
+        fetch_feed(GetDataConfig(base_url=base_url), "portfolio.internal.positions")
 
     assert FixedResponseHandler.received_accept == "application/x-ndjson"

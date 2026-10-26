@@ -12,9 +12,9 @@ fn fixture() -> (Value, GovernedInputConfig, RequestLimits) {
         "trusted_writers":[manifest["writer"]], "authority_writers":[manifest["writer"]], "contracts":[]
     })).unwrap();
     let mut limits = RequestLimits::test();
-    limits.expected_event_type = "deepvest.calculation".into();
+    limits.expected_event_type = "calculation.result".into();
     limits.allowed_input_groups = ["finance".into(), "audit".into()].into();
-    let request = json!({"protocol":"tn.llama.request.v2", "tn_object":manifest["publications"]["deepvest"]["wire"],
+    let request = json!({"protocol":"tn.llama.request.v2", "tn_object":manifest["publications"]["calculation"]["wire"],
         "use":manifest["uses"]["model"],"destination":"internal-client","messages":[{"role":"user","content":"Explain the result."}],"stream":false});
     (request, config, limits)
 }
@@ -33,7 +33,7 @@ fn exact_wire_and_native_identity_survive_transport() {
         serde_json::from_str(include_str!("fixtures/governed/manifest.json")).unwrap();
     assert_eq!(
         accepted.object.id(),
-        manifest["publications"]["deepvest"]["object_id"]
+        manifest["publications"]["calculation"]["object_id"]
             .as_str()
             .unwrap()
     );
@@ -72,7 +72,7 @@ fn closed_profile_refuses_use_changes_types_and_tampering() {
     assert!(parse_governed_object_request(duplicate.as_bytes(), &limits, &config).is_err());
     let mut changed = request.clone();
     let mut object: Value = serde_json::from_str(changed["tn_object"].as_str().unwrap()).unwrap();
-    object["event_type"] = json!("deepvest.forged");
+    object["event_type"] = json!("calculation.forged");
     changed["tn_object"] = json!(object.to_string());
     assert!(parse_governed_object_request(
         &serde_json::to_vec(&changed).unwrap(),

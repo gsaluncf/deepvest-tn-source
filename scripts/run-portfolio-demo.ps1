@@ -56,9 +56,9 @@ try {
         "Process"
     )
 
-    $commandPath = Join-Path $projectRoot ".venv\Scripts\deepvest-tn.exe"
+    $commandPath = Join-Path $projectRoot ".venv\Scripts\tn-governed.exe"
     if (-not (Test-Path -LiteralPath $commandPath -PathType Leaf)) {
-        throw "deepvest-tn command is missing; recreate the project environment."
+        throw "tn-governed command is missing; recreate the project environment."
     }
 
     & $commandPath @(
@@ -69,7 +69,7 @@ try {
         "--llama-port", [string]$LlamaPort
     )
     if ($LASTEXITCODE -ne 0) {
-        throw "deepvest-tn portfolio-demo exited with code $LASTEXITCODE."
+        throw "tn-governed portfolio-demo exited with code $LASTEXITCODE."
     }
 } finally {
     foreach ($name in $containmentNames) {
