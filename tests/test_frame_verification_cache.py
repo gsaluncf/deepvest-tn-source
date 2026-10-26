@@ -120,8 +120,8 @@ def observation(monkeypatch):
                            decoded=decoded, manifests=manifests, caches=caches, clears=clears)
 
 
-def assert_cleared(observation):
-    assert len(observation.caches) >= 3
+def assert_cleared(observation, *, minimum=3):
+    assert len(observation.caches) >= minimum
     assert all(cache.cache_info().maxsize == 128 for cache in observation.caches)
     assert all(cache.cache_info().currsize == 0 for cache in observation.caches)
     assert len(observation.clears) == len(observation.caches)
@@ -171,6 +171,16 @@ def test_next_verification_rechecks_changed_inputs(saved_frame, observation, cha
     if changed == "wire":
         assert observation.reads[source] == 2
         assert observation.receives[source] == 1
+
+
+def test_duplicate_records_across_tapes_are_rejected(saved_frame, observation):
+    root, run = saved_frame
+    checkpoint = next(iter(run["tapes"].values()))
+    run["tapes"]["duplicate"] = dict(checkpoint)
+    (root / "run.json").write_text(json.dumps(run), encoding="utf-8")
+    with pytest.raises(EvidenceError, match="duplicate evidence record"):
+        module.verify_frame(root)
+    assert_cleared(observation, minimum=2)
 
 
 def test_cached_publication_still_checks_each_siblings_declared_facts(saved_frame, observation, monkeypatch):

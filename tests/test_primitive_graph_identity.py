@@ -224,3 +224,31 @@ def test_later_verification_rechecks_changed_inputs(batch_run, change):
     (root / "run.json").write_text(json.dumps(run), encoding="utf-8")
     with pytest.raises((ValueError, GovernedError)):
         verify(root)
+
+
+def test_successful_terminal_record_cannot_follow_failure(batch_run):
+    root, run = batch_run
+    checkpoint = run["tapes"]["gateway"]
+    with ExitStack() as stack:
+        session = stack.enter_context(tn.Session.from_config(str(root / "sessions/gateway/tn.yaml")))
+        catalog = stack.enter_context(tn.Session.from_config(str(root / "sessions/catalog/tn.yaml")))
+        store = PublicationStore(root / "publications")
+        recorder = EvidenceRecorder(session, store, catalog.policy("experiment.evidence"))
+        recorder.context_id = checkpoint["context_id"]
+        recorder._ids = list(store.record_ids(checkpoint["context_id"]))
+        common = {
+            "call_id": "query",
+            "application": "test",
+            "purpose": "internal",
+            "operation": "select",
+        }
+        decision = run["outputs"]["0"]["decision_id"]
+        recorder.append("Failure", **common,
+            details={"decision_id": decision, "error_type": "TestFailure"})
+        recorder.append("Observation", **common,
+            details={"decision_id": decision, "observation": "late-success", "value": True})
+        retained = recorder.export(root / "tapes-with-late-success")
+    run["tapes"]["gateway"] = {**retained, "path": "tapes-with-late-success"}
+    (root / "run.json").write_text(json.dumps(run), encoding="utf-8")
+    with pytest.raises(EvidenceError, match="follows a failure"):
+        verify(root)

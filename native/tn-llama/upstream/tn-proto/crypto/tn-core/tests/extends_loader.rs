@@ -354,9 +354,8 @@ fn parity_with_python_via_dispatch_resolved_yaml() {
     // Cross-SDK parity canary: simulates the exact fixture shape that
     // `python/tn/_dispatch.py::_yaml_for_rust` produces today — a stream
     // yaml at `./.tn/payments/tn.yaml` extending `../default/tn.yaml`.
-    // After this test passes, the Python `_yaml_for_rust` workaround
-    // becomes a backwards-compat layer; Rust no longer needs it to
-    // accept the same input.
+    // Rust accepts this input directly; the Python `_yaml_for_rust`
+    // workaround remains a backwards-compatibility layer.
     let td = tempfile::tempdir().unwrap();
     let default_dir = td.path().join(".tn").join("default");
     let payments_dir = td.path().join(".tn").join("payments");

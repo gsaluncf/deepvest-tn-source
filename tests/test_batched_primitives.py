@@ -1,4 +1,3 @@
-from dataclasses import replace
 from decimal import Decimal
 
 import pytest
@@ -8,7 +7,7 @@ from deepvest_tn.publications import PublicationStore
 from experiments.governed_strings.evidence import EvidenceError, EvidenceRecorder
 from experiments.governed_strings.primitives import Context, VALUE_TYPE
 from experiments.governed_strings.runtime import Assessment, Request
-from experiments.governed_strings.string import OperationDenied, TNString, ValueReference
+from experiments.governed_strings.string import OperationDenied, TNString
 from experiments.governed_strings.numeric import TNNumeric
 
 
@@ -319,6 +318,32 @@ def test_open_batch_reuses_one_receive_then_readmits_on_next_call(context, monke
     with pytest.raises(UseDenied):
         context._open_values(request, values)
     assert len(reads) == 3
+
+
+def test_shared_publication_is_copied_and_merged_once(context, monkeypatch):
+    values = publish(context, [7, 8, 9])
+    request = Request(context.application, context.purpose, "add",
+        tuple(value.reference for value in values), (), (context.session.policy(VALUE_TYPE),), ())
+    copies, includes = [], []
+    native_copy, native_include = tn.DataObject.copy, tn.DataObject.include
+
+    def track_copy(data):
+        copies.append(data)
+        return native_copy(data)
+
+    def track_include(data, other):
+        includes.append((data, other))
+        return native_include(data, other)
+
+    monkeypatch.setattr(tn.DataObject, "copy", track_copy)
+    monkeypatch.setattr(tn.DataObject, "include", track_include)
+    opened = context._open_values(request, values)
+    assert len(copies) == 1
+    assert len({id(data) for data, _content in opened}) == 1
+
+    merged = context._merge_opened(values, opened)
+    assert merged is opened[0][0]
+    assert includes == []
 
 
 @pytest.mark.parametrize("contents", [["Ada", "DO-NOT-INCLUDE-SIBLING"], [7, 818181]])

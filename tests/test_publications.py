@@ -53,6 +53,21 @@ def test_retained_publication_is_exact_and_survives_store_restart(tmp_path):
     assert PublicationStore(tmp_path).get(source.id) == source.forward()
 
 
+def test_identical_retained_bytes_are_not_written_again(tmp_path, monkeypatch):
+    from deepvest_tn import publications
+
+    source = publication()
+    store = PublicationStore(tmp_path)
+    store.put(source)
+
+    def no_rewrite(*_args, **_kwargs):
+        raise AssertionError("identical immutable bytes must use the retained representation")
+
+    monkeypatch.setattr(publications.tempfile, "mkstemp", no_rewrite)
+    assert store.put(source) == source.id
+    assert store.get(source.id) == source.forward()
+
+
 def test_same_native_identity_cannot_replace_retained_wire_representation(tmp_path):
     source = publication()
     reformatted = tn.GovernedObject.parse(json.dumps(source.envelope, indent=2))

@@ -1045,7 +1045,7 @@ def test_tn_flow_consumes_prepared_values_without_recalling_sibling_boundaries(
     execution = execute_deepvest(StubDeepVest(), governed_portfolio)
 
     def forbidden(*_args, **_kwargs):
-        raise AssertionError("Task 5 recalled a forbidden sibling or network boundary")
+        raise AssertionError("Governed execution recalled a forbidden sibling or network boundary")
 
     monkeypatch.setattr(
         "deepvest_tn.polars_stage.run_governed_polars_stage",

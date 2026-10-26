@@ -1,4 +1,4 @@
-"""Measurement-only wrappers for the unchanged application runtime.
+"""Measurement-only wrappers around the application runtime.
 
 Times are local process observations, not signed remote attestations.
 Exclusive times subtract instrumented descendants; inclusive times overlap.

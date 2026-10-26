@@ -968,8 +968,8 @@ impl Runtime {
                  {group:?}_alt.btn.mykit for a second kit in the same group), \
                  got {basename:?}. The kit_bundle exporter regex requires the \
                  .btn.mykit suffix; non-matching files get silently skipped \
-                 and the publisher's own self-kit ships in their place \
-                 (FINDINGS #5). For ergonomic per-recipient bundling, use \
+                 and the publisher's own self-kit ships in their place. \
+                 For per-recipient bundling, use \
                  Runtime::bundle_for_recipient — it handles minting + \
                  canonical filename + export in one call."
             )));

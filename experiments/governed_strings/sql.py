@@ -1,6 +1,6 @@
 """Read-only SQL gateway: resolve governance, authorize, query, publish primitives.
 
-The initial grammar deliberately supports direct-column SELECT ... FROM ... LIMIT
+The supported grammar accepts direct-column SELECT ... FROM ... LIMIT
 with an optional bound limit. Expressions, joins, and predicates need their own
 control-dependency mapping and are rejected rather than assigned guessed lineage.
 """
@@ -13,18 +13,22 @@ import re
 import sqlite3
 from uuid import uuid4
 
+from .numeric_codec import KINDS
 from .runtime import Request
 from .string import OperationDenied
 
 IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SELECT = re.compile(r"^\s*select\s+([A-Za-z0-9_,\s]+)\s+from\s+([A-Za-z_][A-Za-z0-9_]*)"
                     r"(?:\s+limit\s+(\?|[0-9]+))?\s*;?\s*$", re.I)
+SQL_TYPES = {"str": str, **KINDS}
 
 
 def source_identity(path):
     path = Path(path).resolve()
+    with path.open("rb") as stream:
+        snapshot_sha256 = hashlib.file_digest(stream, "sha256").hexdigest()
     return {"kind": "sqlite", "location": path.as_uri(),
-            "snapshot_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+            "snapshot_sha256": snapshot_sha256}
 
 
 @dataclass
@@ -137,7 +141,8 @@ class GovernedSQL:
                     cells = []
                     for index in range(start, min(start + self.batch_size, len(raw_rows))):
                         content = raw_rows[index][column_index]
-                        if type(content).__name__ != resolution.columns[column]["kind"]:
+                        assigned_kind = resolution.columns[column]["kind"]
+                        if assigned_kind not in SQL_TYPES or type(content) is not SQL_TYPES[assigned_kind]:
                             raise TypeError("SQL type differs from its signed column assignment")
                         source = {"table": table, "column": column, "row": index,
                               "query_id": query_id, "assignment_id": resolution.assignment_id,

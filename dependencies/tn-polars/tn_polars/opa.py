@@ -102,8 +102,23 @@ class OpaWasmEvaluator:
         return self.exports["opa_json_parse"](self.store, address, len(raw))
 
     def _read_c_string(self, address):
-        raw = bytes(self.memory.read(self.store, address, self.memory.data_len(self.store)))
-        return raw.split(b"\0", 1)[0].decode("utf-8")
+        """Read only through the terminator instead of copying the entire Wasm memory."""
+        size = self.memory.data_len(self.store)
+        if type(address) is not int or not 0 <= address <= size:
+            raise ValueError("OPA returned a string address outside Wasm memory")
+        chunks = []
+        while address < size:
+            end = min(address + 64 * 1024, size)
+            raw = bytes(self.memory.read(self.store, address, end))
+            terminator = raw.find(b"\0")
+            if terminator >= 0:
+                chunks.append(raw[:terminator])
+                return b"".join(chunks).decode("utf-8")
+            if not raw:
+                break
+            chunks.append(raw)
+            address = end
+        raise ValueError("OPA returned an unterminated string")
 
     def decide(self, policy_input):
         context = self.exports["opa_eval_ctx_new"](self.store)

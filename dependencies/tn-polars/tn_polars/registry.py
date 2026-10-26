@@ -1,10 +1,9 @@
 """Unity Catalog as the registry: resolve a feed name to its governance bundle.
 
-The design doc's two-liner is ``prepare(internal_registry.get("bbg.enrich"))``.
-Here the internal registry is a Unity Catalog server. A governed feed is a UC
-volume holding the compiled vendor reading, the TN governance body, the
-declared profile, and the OPA artifacts. A release is registered back as a UC
-external table over the governed Delta path, so the catalog knows both ends.
+A governed feed is a UC volume holding the compiled vendor reading, the TN
+governance body, the declared profile, and the OPA artifacts. A release is
+registered back as a UC external table over the governed Delta path, so the
+catalog knows both ends.
 """
 
 import json
@@ -229,9 +228,8 @@ class LocalRegistry:
     """A file-backed registry with the same contract as UnityCatalogRegistry.
 
     For laptops and CI. A feeds.json in the root maps a feed name to its
-    bundle directory; releases.json records what went out and where. Swapping
-    this for the Unity Catalog adapter changes one constructor and nothing
-    else, which is the point of the interface.
+    bundle directory; releases.json records what went out and where. Both
+    registries expose the same contract.
     """
 
     def __init__(self, root):

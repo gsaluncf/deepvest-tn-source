@@ -109,6 +109,35 @@ def test_oversized_module_is_used_but_not_retained(source, compilations):
     assert len(compilations) == 2
 
 
+class FakeMemory:
+    def __init__(self, raw):
+        self.raw = raw
+        self.reads = []
+
+    def data_len(self, _store):
+        return len(self.raw)
+
+    def read(self, _store, start, end):
+        self.reads.append((start, end))
+        return self.raw[start:end]
+
+
+def test_opa_string_read_stops_at_the_terminator():
+    evaluator = opa.OpaWasmEvaluator.__new__(opa.OpaWasmEvaluator)
+    evaluator.store = object()
+    evaluator.memory = FakeMemory(b"xx{\"allow\":true}\0" + b"unused" * 20_000)
+    assert evaluator._read_c_string(2) == '{"allow":true}'
+    assert evaluator.memory.reads == [(2, 2 + 64 * 1024)]
+
+
+def test_opa_string_read_rejects_missing_terminator():
+    evaluator = opa.OpaWasmEvaluator.__new__(opa.OpaWasmEvaluator)
+    evaluator.store = object()
+    evaluator.memory = FakeMemory(b"unterminated")
+    with pytest.raises(ValueError, match="unterminated"):
+        evaluator._read_c_string(0)
+
+
 def test_cache_requires_policy_revision(source, compilations):
     with pytest.raises(ValueError, match="revision"):
         opa.OpaWasmEvaluator.from_bytes(source.files["policy.wasm"], source.files["data.json"],

@@ -1,7 +1,6 @@
 //! `.tnpkg` producer / consumer: [`Runtime::export`] and [`Runtime::absorb`].
 //!
-//! The universal package path (Section 3.2 of the 2026-04-24 admin log
-//! architecture plan), behind the `tn export` / `tn absorb` CLI verbs.
+//! The universal package path behind the `tn export` / `tn absorb` CLI verbs.
 //! [`Runtime::export`] packs local ceremony state into a signed `.tnpkg`
 //! described by [`ExportOptions`]; [`Runtime::absorb`] reads one back, verifies
 //! its manifest, applies it, and returns an [`AbsorbReceipt`]. The wire format
@@ -133,8 +132,7 @@ pub struct AbsorbReceipt {
     /// absorbed package. Empty when nothing was overwritten.
     ///
     /// Mirrors Python `AbsorbReceipt.replaced_kit_paths` and TS
-    /// `AbsorbReceipt.replacedKitPaths` (FINDINGS #6 cross-binding
-    /// parity). Iterate this field after absorb to decide whether to
+    /// `AbsorbReceipt.replacedKitPaths`. Iterate this field after absorb to decide whether to
     /// alert / restore / accept the swap rather than relying on a
     /// printed warning.
     pub replaced_kit_paths: Vec<PathBuf>,
@@ -787,9 +785,8 @@ impl Runtime {
                 }
                 let backup = keystore.join(format!("{rel}.previous.{ts}"));
                 std::fs::rename(&dest, &backup)?;
-                // Surface the swap on the receipt (FINDINGS #6 cross-
-                // binding parity with Python and TS). Original bytes
-                // are preserved at `backup`; the destination path is
+                // Surface the swap on the receipt. Original bytes are
+                // preserved at `backup`; the destination path is
                 // recorded so callers can map back to the .previous
                 // sidecar by appending the same UTC timestamp suffix.
                 replaced.push(dest.clone());

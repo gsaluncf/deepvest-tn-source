@@ -130,8 +130,8 @@ impl Runtime {
     /// a wrong-length master key, or a group that can't be built (e.g. a
     /// btn group with neither state nor kit on disk). [`Error::Yaml`](crate::Error::Yaml)
     /// on a yaml parse failure. [`Error::NotImplemented`](crate::Error::NotImplemented)
-    /// for a JWE group (those run through the Python runtime in this
-    /// plan). The ceremony-init / policy-published attestations are
+    /// for a JWE group (those run through the Python runtime).
+    /// The ceremony-init / policy-published attestations are
     /// best-effort and never fail the load.
     ///
     /// # Examples
@@ -473,7 +473,7 @@ impl Runtime {
         //
         //   * ``TN_NO_STDOUT=1`` (env, all sinks)
         //   * yaml ``handlers: [...]`` declared with no ``kind: stdout``
-        //     entry — yaml-as-contract per FINDINGS S0.4. The shipping
+        //     entry, making YAML the stdout-routing contract. The shipping
         //     ``create_fresh`` writes ``handlers: [file.rotating, stdout]``
         //     so the operator can edit/remove the entry to silence stdout
         //     for both admin and user emits without having to set the

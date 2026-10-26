@@ -151,7 +151,7 @@ def _prepare_output_file(path: Path) -> Path:
     resolved = _absolute(path)
     resolved.parent.mkdir(parents=True, exist_ok=True)
     if resolved.exists():
-        raise FileExistsError(f"refusing to replace existing Task 5 material: {resolved}")
+        raise FileExistsError(f"refusing to replace existing runtime material: {resolved}")
     return resolved
 
 

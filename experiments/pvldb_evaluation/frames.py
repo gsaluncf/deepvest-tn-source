@@ -30,7 +30,7 @@ from deepvest_tn.unity import FinanceEditionRequest, resolve_finance_editions
 from experiments.governed_strings.catalog import ReceivedEdition, UnityGovernance, markdown
 from experiments.governed_strings.evidence import EvidenceError
 from experiments.governed_strings.numeric import TNNumeric
-from experiments.governed_strings.numeric_codec import record_value
+from experiments.governed_strings.numeric_codec import KINDS, record_value
 from .numeric_profile import numeric_profile, polars_dtype, build_frame, check_fixed_plan_range
 from experiments.governed_strings.primitives import Context, OPERATIONS
 from experiments.governed_strings.string import OperationDenied, TNString, _active
@@ -269,9 +269,7 @@ def dataframe_calculate(context, rows):
         # All artifact verification and the OPA load decision precede this open.
         policies.decide("load", context.application, sources, set(), use)
         opened = context._open_values(request, values)
-        data = opened[0][0]
-        for other_data, _ in opened[1:]:
-            data.include(other_data)
+        data = context._merge_opened(values, opened)
         frame_rows = [{"name": opened[i][1], "value": opened[i + 1][1]}
                       for i in range(0, len(opened), 2)]
         loaded = build_frame(frame_rows, profile)
@@ -290,7 +288,7 @@ def dataframe_calculate(context, rows):
         result._tn.policies.decide("release", "governed-runtime", result.sources,
             result.row_sources, use, support=result._support, materialized=materialized)
         amount = materialized.select("amount").item()
-        if type(amount).__name__ != profile["kind"]:
+        if type(amount) is not KINDS[profile["kind"]]:
             raise TypeError("dataframe result changed the signed numeric kind")
         if str(materialized.schema["amount"]) != profile["dtype"]:
             raise TypeError("dataframe result changed the signed numeric storage type")

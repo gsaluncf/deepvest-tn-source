@@ -95,9 +95,7 @@ class ExplicitOperations:
                         origins.append(origin)
 
             opened = context._open_values(request, values)
-            data = opened[0][0]
-            for other_data, _ in opened[1:]:
-                data.include(other_data)
+            data = context._merge_opened(values, opened)
             content = compute(*(plain for _, plain in opened))
             if type(content) not in (str, *NUMERIC_TYPES):
                 raise NotImplementedError("explicit computation must return an ordinary string or supported number")

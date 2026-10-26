@@ -1,7 +1,6 @@
 //! Materialized AdminState cache (LKV).
 //!
-//! Mirrors `tn/admin_cache.py` (Section 4 of the 2026-04-24 admin log
-//! architecture plan). The cache holds a materialized `AdminState` plus a
+//! Mirrors `tn/admin_cache.py`. The cache holds a materialized `AdminState` plus a
 //! vector clock keyed by `(did, event_type)`. The on-disk form lives at
 //! `<yaml_dir>/.tn/admin/admin.lkv.json`; in-memory form is the
 //! `AdminStateCache` struct below.
@@ -107,12 +106,9 @@ pub fn resolve_admin_log_path(yaml_dir: &Path, cfg: &Config) -> PathBuf {
     }
 
     // Substitute the at-load-time-known templates first, then check whether
-    // any per-emit-only tokens remain. Pre-fix this branch was guarded by
-    // ``!pel.contains('{')`` so any template (even just ``{yaml_dir}``)
-    // silently fell through to the default path — making the runtime
-    // appear to "lose" admin events relative to where the publisher
-    // expected them. Now ``{yaml_dir}/.tn/admin/admin.ndjson`` and
-    // ``{yaml_dir}/somewhere.ndjson`` both resolve correctly.
+    // any per-emit-only tokens remain. Paths such as
+    // ``{yaml_dir}/.tn/admin/admin.ndjson`` and
+    // ``{yaml_dir}/somewhere.ndjson`` resolve to their substituted locations.
     let yaml_dir_s = yaml_dir.to_string_lossy().into_owned();
     let substituted = pel
         .replace("{yaml_dir}", &yaml_dir_s)

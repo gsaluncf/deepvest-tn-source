@@ -166,9 +166,12 @@ def verify(root):
                         and mb["sequence"] < db["sequence"] and all(mb[k] == db[k] for k in
                         ("context_id", "application", "purpose", "operation", "inputs", "destination"))
                         and mb["details"]["actor"] == dd["actor"], "monitoring did not precede this permit")
-            if "Failure" not in terminal:
+            if "Failure" in terminal:
+                require(terminal.count("Failure") == 1 and terminal[-1] == "Failure",
+                        "successful operation evidence follows a failure")
+            else:
                 expected = {"reveal": "Disclosure", "compare": "Observation", "truth": "Observation", "is_integer": "Observation", "model_handoff": "ModelResult"}.get(db["operation"], "Result")
-                # A SELECT yielding zero rows has SQLRead but no Result (this run has two rows).
+                # A SELECT yielding zero rows has SQLRead but no Result.
                 require(all(t == expected for t in terminal), "wrong completion kind for operation")
 
         results = {}

@@ -43,7 +43,7 @@ fn build_rust_admin_snapshot_fixture() {
     let cer = common::setup_minimal_btn_ceremony(td.path());
     let rt = Runtime::init(&cer.yaml_path).unwrap();
 
-    // The kit_bundle exporter regex (FINDINGS #5) requires the
+    // The kit_bundle exporter regex requires the
     // `.btn.mykit` filename suffix; non-matching files get silently
     // skipped and the publisher's own self-kit ships in their place.
     let kit_a = td.path().join("alice.btn.mykit");

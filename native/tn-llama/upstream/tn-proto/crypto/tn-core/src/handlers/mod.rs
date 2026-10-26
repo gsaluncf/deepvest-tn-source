@@ -16,10 +16,9 @@
 //! | `fs.drop`   | [`fs_drop::FsDropHandler`]   | Drop `.tnpkg` into an outbox dir.      |
 //! | `fs.scan`   | [`fs_scan::FsScanHandler`]   | Watch a dir + absorb dropped files.    |
 //!
-//! The Python registry supports more kinds (`file.rotating`, `kafka`,
-//! `delta`, `s3`, etc.). Those remain Python-only for now (out of scope for
-//! the four push/pull handlers landed in commit 78f5617). Adding them later
-//! follows the same trait + registry pattern.
+//! The Python registry also supports `file.rotating`, `kafka`, `delta`,
+//! `s3`, and other kinds. Those handlers remain Python-only; additional
+//! Rust handlers can follow the same trait and registry pattern.
 //!
 //! Handlers attached via [`crate::Runtime::add_handler`] are fanned out to for
 //! every envelope the runtime writes — matching Python's `Logger.handlers` loop

@@ -168,7 +168,10 @@ def verify_frame(root):
             _require(len(files) == checkpoint["count"], "record checkpoint count differs")
             records.extend(verify_tape([path.read_bytes() for path in files], session=session, policy=audit,
                 expected_writer=checkpoint["writer"], expected_context=checkpoint["context_id"], expected_head=checkpoint["head"]))
-        by_id = {record.id: record for record in records}
+        by_id = {}
+        for record in records:
+            _require(record.id not in by_id, "duplicate evidence record across tapes")
+            by_id[record.id] = record
         frame_results = [record for record in records if record.body["kind"] == "Result"
                          and record.body["operation"] == "dataframe_calculate"]
         _require(len(frame_results) == 1, "expected one completed dataframe Result")

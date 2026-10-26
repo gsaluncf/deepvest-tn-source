@@ -72,14 +72,14 @@ def adapt_finance_source_record(row: ModelBoundTNRow) -> SourceRecord:
     if groups != (_FINANCE_GROUP, _GOVERNANCE_GROUP):
         raise ValueError("finance source must encrypt exactly finance and tn.agents")
     if parsed != dict(row.envelope):
-        raise ValueError("finance source bytes differ from the Task 5 envelope")
+        raise ValueError("finance source bytes differ from the governed envelope")
     if (
         parsed["event_id"] != row.event_id
         or parsed["row_hash"] != row.row_hash
         or parsed.get("device_identity") != row.source_writer_did
         or groups != row.encrypted_groups
     ):
-        raise ValueError("finance source headers differ from the Task 5 metadata")
+        raise ValueError("finance source headers differ from the governed metadata")
     return SourceRecord(
         ndjson=raw,
         event_id=row.event_id,
@@ -106,7 +106,7 @@ def submit_finance_report(
     """Submit one exact governed request and return only a recipient-opened release."""
     row = flow.source_row if selected_row is None else selected_row
     if row is not flow.source_row and row is not flow.marker_free_row:
-        raise ValueError("selected TN row is not one of the exact Task 5 handoff rows")
+        raise ValueError("selected TN row is not one of the exact governed handoff rows")
     transcript_path, received_output_path, output_reader_key_dir = (
         _preflight_submit_paths(
             flow,
@@ -272,7 +272,7 @@ def _sha256(path: Path) -> str:
 def _active_output_policy(flow: TNFlowResult) -> dict[str, str]:
     writer = tn.init(flow.output_writer.config_path, link=False, stdout=False)
     if writer.cfg.ceremony_id != flow.output_writer.ceremony_id:
-        raise ValueError("active TN output ceremony differs from Task 5 material")
+        raise ValueError("active TN output ceremony differs from governed material")
     document = tn.agents.policy()
     template = document.templates.get(_OUTPUT_EVENT_TYPE) if document is not None else None
     if template is None:
@@ -302,7 +302,7 @@ def _validate_task5_material(flow: TNFlowResult) -> None:
         or flow.output_writer.index_epoch != 0
         or flow.input_reader.ceremony_id == flow.output_writer.ceremony_id
     ):
-        raise ValueError("Task 5 TN ceremony or index provenance is inconsistent")
+        raise ValueError("governed TN ceremony or index provenance is inconsistent")
 
 
 def write_finance_runtime_config(

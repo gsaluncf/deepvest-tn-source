@@ -22,6 +22,10 @@ def object_digest(object_id: str) -> str:
 
 def write_once(path: Path, content: bytes) -> None:
     """Atomically expose complete bytes without replacing any existing representation."""
+    if path.exists():
+        if path.read_bytes() != content:
+            raise ValueError(f"immutable publication representation differs: {path.name}")
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix=".publication-", dir=path.parent)
     try:

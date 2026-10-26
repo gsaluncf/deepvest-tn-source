@@ -22,7 +22,7 @@ with context:
     report = endpoint.generate(brief, prompt=PROMPT)
 ```
 
-This excerpt uses the existing APIs. Setup supplies `db` and `context`, then configures `endpoint` for the completed `brief`. The context checks operations against the applicable rules and records their outcomes. [The commented example below](#commented-walkthrough-of-the-papers-example) explains each call; [run.py](experiments/pvldb_evaluation/run.py) contains the full setup. In this example, `report.report_html` is the accepted draft and `report.review` identifies the queued review request.
+This excerpt uses these APIs. Setup supplies `db` and `context`, then configures `endpoint` for the completed `brief`. The context checks operations against the applicable rules and records their outcomes. [The commented example below](#commented-walkthrough-of-the-papers-example) explains each call; [run.py](experiments/pvldb_evaluation/run.py) contains the full setup. In this example, `report.report_html` is the accepted draft and `report.review` identifies the queued review request.
 
 ## The example in this submission
 

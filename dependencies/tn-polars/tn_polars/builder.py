@@ -1,9 +1,8 @@
 """The proxy builder: prepare a policy once, load records against it many times.
 
-The developer-facing lifecycle from the design doc. prepare() resolves the
-governance machinery once, before anything runs. load() is where the guarantee
-starts: it pins the schema, and every call returns a new bound governed frame,
-so a second load never mutates the first.
+prepare() resolves the governance machinery once, before anything runs. load()
+pins the schema and returns a new bound governed frame on every call, so a
+second load never mutates the first.
 """
 
 from .admission import admit
@@ -27,16 +26,15 @@ class PreparedPolicy:
 
 
 class GovernedPolars:
-    """Entry point matching the design doc: GovernedPolars.prepare(...).load(...)."""
+    """Entry point for GovernedPolars.prepare(...).load(...)."""
 
     @staticmethod
     def prepare(policy, tn_governance=None, evaluator=None, *, dtypes=None):
         """Build a PreparedPolicy from parts, or from one registry entry.
 
-        The one-argument form is the design doc's lifecycle: the argument is
-        what ``registry.get(name)`` returned, and it carries the compiled
-        policy, the TN governance body, the declared dtypes, and the OPA
-        artifacts to build the evaluator from.
+        The one-argument form accepts the result of ``registry.get(name)``,
+        including its compiled policy, TN governance body, declared dtypes,
+        and OPA artifacts used to build the evaluator.
         """
         if tn_governance is None and evaluator is None:
             entry = policy

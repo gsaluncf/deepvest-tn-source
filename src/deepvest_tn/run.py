@@ -489,7 +489,7 @@ def _provision_first_pass_tn(
         "output_index_key_path": state / "output.index.key",
     }
     for name, path in generated_paths.items():
-        _require_run_owned_path(run_directory, path, label=f"Task 5 {name}")
+        _require_run_owned_path(run_directory, path, label=f"governed {name}")
     return provision_tn_flow(
         portfolio,
         execution,
@@ -579,7 +579,7 @@ def _summary_document(
     output_row = json.loads(release.output_ndjson.removesuffix("\n"))
     output_event_type = output_row.get("event_type")
     if source_event_type != "portfolio.deepvest.calculated":
-        raise ValueError("Task 5 source event type changed before summary")
+        raise ValueError("governed source event type changed before summary")
     if output_event_type != "report.generated":
         raise ValueError("verified output event type is not report.generated")
     return {

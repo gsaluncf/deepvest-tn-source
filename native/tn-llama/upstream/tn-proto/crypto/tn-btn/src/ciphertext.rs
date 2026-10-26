@@ -5,10 +5,9 @@
 //! self-contained [`Ciphertext`] that any entitled [`ReaderKeyset`]
 //! can decrypt without consulting the publisher.
 //!
-//! v0.1 keeps the surface free-function: `encrypt_to_cover` and
-//! `decrypt_with_keyset`. The higher-level `PublisherState` wrapper
-//! will land in a later commit and just orchestrates calls into
-//! these plus revocation bookkeeping.
+//! The free functions `encrypt_to_cover` and `decrypt_with_keyset`
+//! compose these operations; `PublisherState` coordinates them with
+//! revocation bookkeeping.
 
 use crate::crypto::aead::{open, random_nonce, seal, NONCE_LEN};
 use crate::crypto::kw::{unwrap, wrap, WRAPPED_LEN};
@@ -238,7 +237,7 @@ mod tests {
             decrypt_with_keyset_with_aad(&ks, &ct, b"governed-by:NOBODY ; policy=none"),
             Err(Error::NotEntitled)
         ));
-        // 3. Stripped flag (empty aad, the pre-change default) -> fails.
+        // 3. Empty AAD -> fails.
         assert!(matches!(
             decrypt_with_keyset_with_aad(&ks, &ct, &[]),
             Err(Error::NotEntitled)

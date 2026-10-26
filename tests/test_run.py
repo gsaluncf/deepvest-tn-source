@@ -794,7 +794,7 @@ def test_tn_root_link_is_refused_before_task5_or_outside_mutation(
 
     def unexpected_task5(*_args, **_kwargs):
         task5_calls.append(object())
-        raise AssertionError("Task 5 must not receive an escaped path")
+        raise AssertionError("Governed provisioning must not receive an escaped path")
 
     monkeypatch.setattr(run_module, "execute_deepvest", create_link_after_deepvest)
     monkeypatch.setattr(run_module, "provision_tn_flow", unexpected_task5)

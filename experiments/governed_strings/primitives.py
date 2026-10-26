@@ -222,20 +222,34 @@ class Context(StringContext):
         return request, items, self._decision(request, call_id)
 
     def _open_values(self, request, values):
-        result, opened = [], {}
+        result, opened, copies = [], {}, {}
         for value in values:
             key = value.reference.object_id, value.reference.group
             if key not in opened:
                 data = self._read(value, [value.reference.group, "evidence"], request.operation)
                 opened[key] = data, data.get("manifest", group="evidence")
+                copies[key] = data.copy()
             data, manifest = opened[key]
             payload = data.get(value.reference.field, group=value.reference.group)
             facts = manifest["bindings"][value.reference.field]["declared"]
             content = decode(payload, facts["kind"])
             if describe(content) != facts:
                 raise EvidenceError("declared facts do not match the opened content")
-            result.append((data.copy(), content))
+            result.append((copies[key], content))
         return result
+
+    def _merge_opened(self, values, opened):
+        """Combine each contributing publication/group once, preserving field-level inputs."""
+        if not values or len(values) != len(opened):
+            raise ValueError("opened values must match nonempty governed inputs")
+        data = opened[0][0]
+        merged = {(values[0].reference.object_id, values[0].reference.group)}
+        for value, (other_data, _) in zip(values[1:], opened[1:], strict=True):
+            identity = value.reference.object_id, value.reference.group
+            if identity not in merged:
+                data.include(other_data)
+                merged.add(identity)
+        return data
 
     def _release_value(self, data, request):
         use = tn.UseContext(self.application, self.purpose, request.operation)
@@ -359,10 +373,9 @@ class Context(StringContext):
                 content, declared = None, binding["declared"]
             else:
                 opened = self._open_values(request, values)
-                data, content = opened[0]
+                data = self._merge_opened(values, opened)
+                content = opened[0][1]
                 declared = None
-                for other_data, _ in opened[1:]:
-                    data.include(other_data)
                 if operation == "reveal":
                     self._append("Disclosure", request, call_id, {
                         "decision_id": decision, "subject": values[0].reference.to_dict(),
