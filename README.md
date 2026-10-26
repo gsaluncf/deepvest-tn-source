@@ -445,3 +445,60 @@ For the smaller SQL/string/numeric demonstration:
 python -m tn_governed.values.demo --numeric-type Decimal --run-directory experiments/results/sql-primitives
 python -m tn_governed.values.verify experiments/results/sql-primitives
 ```
+
+## Policy across endpoints
+
+Each endpoint has its own identity, accepted authorities, decryption keys, and evaluator. A receiving endpoint verifies the incoming publication and decides whether its own requested use is permitted. Earlier decisions remain attributable evidence; the receiving endpoint makes its own decision.
+
+The Quick Start performs origination and calculation in one local session. The diagram follows the same value handling through the separate endpoints used by the SQL, dataframe, and report workflow. Governed Python objects are references to stored publications. Calls within Python pass those references; the model request transports the exact encrypted publication.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF4FF", "primaryTextColor": "#17324D", "primaryBorderColor": "#4479A5", "lineColor": "#4479A5", "actorBkg": "#EAF4FF", "actorBorder": "#4479A5", "actorTextColor": "#17324D", "noteBkgColor": "#F5F9FD", "noteBorderColor": "#A8BED1", "fontFamily": "Segoe UI, Arial, sans-serif"}, "sequence": {"useMaxWidth": true, "wrap": false, "actorMargin": 32, "height": 50, "messageMargin": 18, "noteMargin": 8, "mirrorActors": false, "actorFontFamily": "Segoe UI, Arial, sans-serif", "messageFontFamily": "Segoe UI, Arial, sans-serif", "noteFontFamily": "Segoe UI, Arial, sans-serif", "actorFontSize": 14, "messageFontSize": 14, "noteFontSize": 14}}}%%
+sequenceDiagram
+    autonumber
+    participant App as Application code
+    box rgb(240,246,252) Source endpoint
+        participant Source as Source runtime
+    end
+    box rgb(232,244,255) Processing endpoint
+        participant Worker as Context and Polars
+    end
+    box rgb(240,246,252) Model endpoint
+        participant Model as Native model service
+    end
+    box rgb(232,244,255) Report recipient
+        participant Reader as Recipient Session
+    end
+
+    App->>Source: originate(context, raw, policy, label)<br/>or GovernedSQL.execute(...)
+    Note over Source: Local policy file or verified<br/>signed source assignment
+    Source->>Source: Check use and prerequisites locally<br/>before the query or publication
+    Source->>Source: Encrypt value and governance<br/>sign and retain the publication
+    Source-->>App: TNString / TNNumeric references<br/>Policy stays in the referenced publication
+
+    App->>Worker: dataframe_calculate(context, rows)<br/>then upper(), +, as_string()
+    Worker->>Worker: Verify inputs and authority<br/>Evaluate locally, using OPA for the dataframe
+    Worker->>Worker: Complete prerequisites, decrypt, compute<br/>Retain policies, claims, and input references
+    Worker-->>App: Governed brief referencing<br/>its encrypted, signed publication
+
+    App->>Worker: NativeModelEndpoint.generate(brief, ...)
+    Worker->>Worker: Evaluate the handoff locally<br/>record the decision and intended recipient
+    Worker->>Model: Exact encrypted brief + requested use<br/>Source governance travels inside the publication
+    Model->>Model: Verify writers, policies, and ancestry<br/>Evaluate locally before opening values
+    Note over Model: The model proposes content.<br/>Runtime code preserves governance.
+    Model->>Model: Authorize and run the required tool<br/>verify its signed result
+    Model->>Model: Include source and tool publications<br/>check release conditions and sign the report
+    Model-->>Worker: Encrypted report with source policies,<br/>claim references, and source/tool links
+
+    Worker->>Reader: NativeOutputReader.open(release)
+    Reader->>Reader: Verify report and evaluate use locally<br/>Decrypt only after acceptance
+    Reader-->>Worker: Accepted report object
+    Worker->>Worker: Read report_html from accepted object<br/>Sign and queue ReviewRequested<br/>Append ModelResult
+    Worker-->>App: NativeReport: accepted draft<br/>and pending-review reference
+```
+
+Values and governance are encrypted together in TN publications, bound through authenticated data and signatures. Derivatives retain source policies and the original authors and subjects of claims. Signed operation records identify the endpoint that wrote them. A later endpoint's signature does not make the source author responsible for its decisions or results.
+
+Each endpoint uses its own Session to decide what it will accept and release. This is the federation: endpoints exchange governed publications and verifiable records, then apply their own authority rules. Unity can locate signed assignments and policy revisions. The endpoints perform the authorization checks.
+
+The signed report retains its governance after the recipient accepts it. The returned HTML is an authorized plaintext copy; the application records its digest and the signed report's identity in the pending-review request and model result.
