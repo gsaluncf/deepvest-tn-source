@@ -450,31 +450,8 @@ python -m tn_governed.values.verify experiments/results/sql-primitives
 
 The application calls the SQL source, dataframe runtime, and model service. Each evaluates policy for its own identity and requested use. The application accepts the report using a separate recipient Session.
 
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF4FF", "primaryTextColor": "#17324D", "primaryBorderColor": "#4479A5", "lineColor": "#4479A5", "actorBkg": "#EAF4FF", "actorBorder": "#4479A5", "actorTextColor": "#17324D", "activationBkgColor": "#D6E9FA", "activationBorderColor": "#4479A5", "noteBkgColor": "#F5F9FD", "noteBorderColor": "#A8BED1"}, "sequence": {"useMaxWidth": true, "wrap": false, "actorMargin": 40, "height": 40, "messageMargin": 16, "noteMargin": 6, "mirrorActors": false}}}%%
-sequenceDiagram
-    participant App as Application
-    participant SQL as SQL source
-    participant Frame as Dataframe runtime
-    participant Model as Model service
-
-    App->>+SQL: execute(query)
-    Note right of SQL: Load policy<br/>Check policy for query
-    SQL-->>-App: Governed values + policies
-
-    App->>+Frame: dataframe_calculate(context, rows)
-    Note right of Frame: Check policy for calculation<br/>Preserve source governance
-    Frame-->>-App: Derived value + policies
-
-    App->>+Model: generate(brief, ...)<br/>Governed value + policies
-    Note right of Model: Check policy for generation<br/>Complete required tool
-    Model-->>-App: Encrypted report + policies
-
-    activate App
-    Note right of App: Check policy for recipient and accept report<br/>Queue human review, then return draft
-    deactivate App
-```
+[![Sequence of policy checks and governed values across the SQL source, dataframe runtime, model service, and report recipient](assets/diagrams/policy-sequence.png)](assets/diagrams/policy-sequence.png)
 
 Values and governance remain encrypted in signed TN publications. Local calls can pass references to those publications. Derivatives retain source policies, claim attribution, and derivation links; the model runtime preserves these when it publishes the report.
 
-Policy evaluation stays at each endpoint. Each applies its own authority rules to the carried policies and claims. Unity can supply signed policy records; authorization happens at the endpoint using the data. The Quick Start runs in one local Session; the full SQL-to-report example uses separate Sessions.
+Policy evaluation stays at each endpoint. Each applies its own authority rules to the carried policies and claims. Unity locates signed policy records; authorization happens at the endpoint using the data. The Quick Start runs in one local Session; the full SQL-to-report example uses separate Sessions.
