@@ -450,8 +450,8 @@ python -m tn_governed.values.verify experiments/results/sql-primitives
 
 The application calls the SQL source, dataframe runtime, and model service. Each evaluates policy for its own identity and requested use. The application accepts the report using a separate recipient Session.
 
-[![Sequence of policy checks and governed values across the SQL source, dataframe runtime, model service, and report recipient](assets/diagrams/policy-sequence.png)](assets/diagrams/policy-sequence.png)
+[![Each encrypted governed value contains its content, policy, and claims. The source, dataframe runtime, model service, and recipient each evaluate use under their own authority.](assets/diagrams/policy-sequence.png)](assets/diagrams/policy-sequence.png)
 
-Values and governance remain encrypted in signed TN publications. Local calls can pass references to those publications. Derivatives retain source policies, claim attribution, and derivation links; the model runtime preserves these when it publishes the report.
+Each encrypted governed value contains both its content and its governance in a signed TN publication. Local calls can pass references to those publications. Derivatives retain source policies, claim attribution, and derivation links; the model runtime preserves these when it publishes the report.
 
 Policy evaluation stays at each endpoint. Each applies its own authority rules to the carried policies and claims. Unity locates signed policy records; authorization happens at the endpoint using the data. The Quick Start runs in one local Session; the full SQL-to-report example uses separate Sessions.
