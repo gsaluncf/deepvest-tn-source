@@ -72,8 +72,8 @@ fn python_sealed_objects_verify_and_open() {
         }
 
         // 1. Parse + self-describing verify. The container/unicode
-        //    public cases are the end-to-end R1 proof: Python hashed
-        //    them as str(value); the Rust recompute must agree.
+        //    public cases were hashed by Python as str(value);
+        //    Rust must compute the same hash.
         let env = parse_sealed_source(&case.wire)
             .unwrap_or_else(|e| panic!("case={}: parse failed: {e}", case.name));
         let blocks = extract_group_blocks(&env)
@@ -98,7 +98,7 @@ fn python_sealed_objects_verify_and_open() {
         }
 
         // 3. Open every expected group with the provided key files via
-        //    the R4 walk primitives (candidate loading + AAD-bound
+        //    the reader-key selection (candidate loading + AAD-bound
         //    decrypt), one group per as-recipient call.
         let td = tempfile::tempdir().unwrap();
         for (fname, b64) in &case.keys {

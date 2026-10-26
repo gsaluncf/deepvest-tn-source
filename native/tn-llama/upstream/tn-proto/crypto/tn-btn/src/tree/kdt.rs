@@ -23,10 +23,8 @@ pub type NodeKey = Zeroizing<[u8; KEY_LEN]>;
 
 /// Info tag used when deriving the root key from the master seed.
 ///
-/// Deriving the root via HKDF rather than using `master_seed` directly
-/// lets us domain-separate "root key" from other uses of the same seed
-/// (future rotation, epoch derivation, etc. — all gated by distinct
-/// info labels).
+/// The HKDF info label separates root-key derivation from other uses
+/// of the master seed.
 const INFO_ROOT: &[u8] = b"btn.v1.root";
 
 /// Derive the root node key from a master seed.

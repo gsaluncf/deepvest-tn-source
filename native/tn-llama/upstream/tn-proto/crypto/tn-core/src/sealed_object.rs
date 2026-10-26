@@ -213,7 +213,7 @@ pub fn extract_group_blocks(env: &Map<String, Value>) -> Result<BTreeMap<String,
 
 /// Verify a sealed envelope: recompute its row hash self-describingly
 /// and check its signature. Never errors — any decode or verify
-/// failure simply reports `false` for that check (the caller decides
+/// failure reports `false` for that check (the caller decides
 /// whether that is fatal; mirrors `seal.py:310-345`).
 ///
 /// Self-describing recompute: every key not in [`ENVELOPE_RESERVED`]

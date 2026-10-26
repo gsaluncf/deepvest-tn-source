@@ -1,9 +1,7 @@
-//! THE ACCEPTANCE GATE.
+//! Interoperability with hohibe-generated BBG vectors.
 //!
-//! Reads the frozen hohibe-generated golden vectors (crypto/tn-hibe's
-//! tests/golden/vectors.json) and proves that tn-bbg — our own Apache-2.0 BBG
-//! reimplementation — opens them with zero wire change. If this passes, hohibe
-//! can be swapped out behind tn-hibe with no on-wire difference.
+//! Reads crypto/tn-hibe/tests/golden/vectors.json and checks that tn-bbg
+//! decrypts those ciphertexts using the stored keys and wire encoding.
 //!
 //! The golden bytes were produced by hohibe (LGPL), used here strictly as a
 //! black-box correctness oracle — no hohibe source is linked or read.
@@ -47,8 +45,8 @@ fn interop_gate_tn_bbg_opens_frozen_hohibe_vectors() {
         let sk = PrivateKey::from_bytes(&h(&entry["sk"])).unwrap();
         assert_eq!(sk.identity(), &id, "identity labels: {path}");
 
-        // GATE 1a — BBG decrypt: our decrypt opens the FROZEN hohibe ciphertext
-        // with the FROZEN hohibe key, recovering the frozen GT message.
+        // Decrypt the hohibe ciphertext with its stored key and compare
+        // the recovered GT message with the expected bytes.
         let ct = raw::Ciphertext::from_bytes(&h(&entry["ct"])).unwrap();
         let m = raw::decrypt(&pp, &sk, &ct).expect("decrypt");
         assert_eq!(
@@ -57,8 +55,7 @@ fn interop_gate_tn_bbg_opens_frozen_hohibe_vectors() {
             "BBG DECRYPT INTEROP FAILED at {path}: recovered GT != frozen m"
         );
 
-        // GATE 1b — KEM: our kem_unwrap recovers the FROZEN CEK from the FROZEN
-        // wrapped blob. This is the wire path a real hibe group rides.
+        // Unwrap the stored blob and compare the recovered content key.
         let cek: [u8; 32] = h(&entry["cek"]).try_into().unwrap();
         assert_eq!(
             kem_unwrap(&pp, &sk, &h(&entry["wrapped"])).expect("kem_unwrap"),
@@ -66,8 +63,7 @@ fn interop_gate_tn_bbg_opens_frozen_hohibe_vectors() {
             "KEM UNWRAP INTEROP FAILED at {path}"
         );
 
-        // GATE 1c — full hybrid blob: our open() recovers the frozen body from
-        // the FROZEN sealed blob (KEM + AES-GCM body).
+        // Open the stored KEM and AES-GCM blob and compare the plaintext.
         assert_eq!(
             open(&pp, &sk, &h(&entry["sealed"])).expect("open"),
             h(&entry["body"]),
@@ -75,8 +71,8 @@ fn interop_gate_tn_bbg_opens_frozen_hohibe_vectors() {
         );
     }
 
-    // GATE 1d — cross-direction: a LIVE tn-bbg wrap opens with the FROZEN
-    // hohibe key, and delegation from a frozen parent opens a historical wrap.
+    // A tn-bbg wrap must open with the stored hohibe key. A delegated
+    // key from the stored parent must open the matching ciphertext.
     let mut rng = ChaCha20Rng::seed_from_u64(7);
     let entries = v["paths"].as_array().unwrap();
     for entry in entries {

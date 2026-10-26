@@ -53,7 +53,6 @@ fn revoke_then_subsequent_decrypt_fails_for_revoked_kit() {
 
     let entries = rt.read_raw().unwrap();
     // Log now contains: x.test(before), tn.recipient.added, tn.recipient.revoked, x.test(after).
-    // Admin verbs emit valid catalog events after the schema enforcement fix (Task C.1).
     let business: Vec<_> = entries
         .iter()
         .filter(|e| e.envelope["event_type"].as_str() == Some("x.test"))

@@ -131,7 +131,7 @@ pub enum Error {
     #[error("btn error: {0}")]
     Btn(#[from] tn_btn::Error),
 
-    /// Feature exists in the plan but is not yet implemented.
+    /// The requested feature is not implemented.
     #[error("feature not implemented: {0}")]
     NotImplemented(&'static str),
 

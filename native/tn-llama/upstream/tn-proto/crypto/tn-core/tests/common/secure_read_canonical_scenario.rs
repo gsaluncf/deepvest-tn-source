@@ -251,10 +251,8 @@ pub fn canonical_json_bytes(obj: &Value) -> Vec<u8> {
 // --------------------------------------------------------------------------
 // Per-admin-event canonical scenarios. Each pair `(event_type, fields)` is
 // the exact emit-time payload `canonical_bytes(...)` runs over for the
-// row_hash. Mirrored byte-for-byte by the Python + TS builders. Adding an
-// event_type here pins the canonical shape across all three SDKs and would
-// have caught the 2026-04-25 e2e canonicalization-drift report on the
-// protocol-spec side.
+// row_hash. Mirrored byte-for-byte by the Python and TypeScript builders
+// to check canonical encoding across SDKs.
 // --------------------------------------------------------------------------
 
 /// Returns `(event_type, fields)` pairs in stable insertion order. The

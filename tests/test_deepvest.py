@@ -68,7 +68,7 @@ class RecordingUnityTransport:
 
 @pytest.fixture(scope="module")
 def finance_bundles(tmp_path_factory) -> dict[str, Path]:
-    return build_finance_feed_bundles(tmp_path_factory.mktemp("task4-finance-bundles"))
+    return build_finance_feed_bundles(tmp_path_factory.mktemp("deepvest-finance-bundles"))
 
 
 @pytest.fixture()

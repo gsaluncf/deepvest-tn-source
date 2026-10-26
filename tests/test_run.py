@@ -7,9 +7,11 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import threading
 import urllib.request
 import uuid
+import venv
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import replace
@@ -78,7 +80,7 @@ def local_getdata_service(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[tuple[str, Path]]:
     global _ACTIVE_FEED_URL
-    data_dir = seed_finance_feed_data(tmp_path_factory.mktemp("task2-getdata") / "data")
+    data_dir = seed_finance_feed_data(tmp_path_factory.mktemp("getdata") / "data")
     server = create_feed_server(
         FeedServerConfig(data_dir=data_dir, event_stream=io.StringIO(), port=0)
     )
@@ -109,7 +111,7 @@ def isolated_tn(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.fixture(scope="module")
 def finance_bundles(tmp_path_factory) -> dict[str, Path]:
-    return build_finance_feed_bundles(tmp_path_factory.mktemp("task7-finance-bundles"))
+    return build_finance_feed_bundles(tmp_path_factory.mktemp("finance-bundles"))
 
 
 class RecordingUnityTransport:
@@ -190,7 +192,7 @@ def _canonical_release_body(flow: TNFlowResult) -> bytes:
     return json.dumps(
         {
             "protocol": "tn.llama.release.v1",
-            "run_id": "task7-deterministic-run",
+            "run_id": "test-deterministic-run",
             "source_event_id": flow.source_row.event_id,
             "source_row_hash": flow.source_row.row_hash,
             "output_event_id": emitted["event_id"],
@@ -252,10 +254,10 @@ def _install_fake_local_dependencies(
     bin_directory = build_directory / "bin"
     bin_directory.mkdir(parents=True)
     server_path = bin_directory / "llama-server.exe"
-    server_path.write_bytes(b"task7-governed-server")
-    (bin_directory / "llama.dll").write_bytes(b"task7-companion")
+    server_path.write_bytes(b"test-governed-server")
+    (bin_directory / "llama.dll").write_bytes(b"test-companion")
     model_path = dependency_root / "model.gguf"
-    model_path.write_bytes(b"task7-model")
+    model_path.write_bytes(b"test-model")
     launcher_path = dependency_root / "run-tn-server.ps1"
     launcher_path.write_text("# deterministic process double", encoding="utf-8")
     monkeypatch.setattr(run_module, "_PROJECT_ROOT", project_root.resolve())
@@ -279,7 +281,7 @@ def _first_pass_case(
         run_directory=run_directory,
         unity_url="http://127.0.0.1:18080",
         llama_port=_free_port(),
-        api_key="task7-test-key",
+        api_key="fixture-api-key",
         feed_url=_ACTIVE_FEED_URL,
     )
 
@@ -372,7 +374,7 @@ def test_first_pass_composes_real_stages_and_saves_only_recipient_opened_output(
         finance_bundles,
         base_url=unity_url,
     )
-    api_key = "task7-sentinel-api-key"
+    api_key = "test-sentinel-api-key"
     port = _free_port()
     events: list[str] = []
     handoff: dict[str, object] = {}
@@ -482,7 +484,7 @@ def test_first_pass_composes_real_stages_and_saves_only_recipient_opened_output(
     server_spec = handoff["server_spec"]
     assert server_spec.build_directory == run_directory / "execution" / "governed-build"
     assert (server_spec.build_directory / "bin" / "llama.dll").read_bytes() == (
-        b"task7-companion"
+        b"test-companion"
     )
     runtime_document = json.loads(server_spec.runtime_config_path.read_text(encoding="utf-8"))
     assert runtime_document["binary_sha256"] == _sha256(
@@ -673,7 +675,6 @@ def test_unavailable_getdata_stops_before_deepvest_or_tn(
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
 ) -> None:
-    # Break caught: a denied business-data response could reach protected downstream stages.
     _project_root, config = _first_pass_case(tmp_path, monkeypatch, name="getdata-denied")
     config = replace(config, feed_url="http://127.0.0.1:1")
     _install_unity_transport(monkeypatch, finance_bundles, base_url=config.unity_url)
@@ -712,7 +713,6 @@ def test_pre_deepvest_getdata_denials_never_reach_deepvest_or_tn(
     failure: str,
     expected_error: type[Exception],
 ) -> None:
-    # Break caught: malformed or substituted ordinary data could reach protected downstream stages.
     import deepvest_tn.polars_stage as polars_stage
 
     _project_root, config = _first_pass_case(tmp_path, monkeypatch, name=f"getdata-{failure}")
@@ -732,7 +732,12 @@ def test_pre_deepvest_getdata_denials_never_reach_deepvest_or_tn(
         if failure == "malformed":
             return replace(fetched, body=b"not-ndjson\n")
         if failure == "schema":
-            return replace(fetched, body=fetched.body.replace(b"}\n", b",\"unexpected\":true}\n"))
+            rows = [json.loads(line) for line in fetched.body.splitlines()]
+            altered = b"".join(
+                json.dumps({**row, "unexpected": True}).encode("utf-8") + b"\n"
+                for row in rows
+            )
+            return replace(fetched, body=altered)
         return replace(fetched, body=fetched.body.replace(b'"quantity":125', b'"quantity":"125"'))
 
     def forbidden(name: str):
@@ -772,7 +777,7 @@ def test_first_pass_rejects_non_loopback_or_non_http_feed_url_before_any_boundar
     assert calls == []
 
 
-def test_tn_root_link_is_refused_before_task5_or_outside_mutation(
+def test_tn_root_link_is_refused_before_provisioning_or_outside_mutation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
@@ -782,7 +787,7 @@ def test_tn_root_link_is_refused_before_task5_or_outside_mutation(
     outside = tmp_path / "outside-tn"
     outside.mkdir()
     real_deepvest = run_module.execute_deepvest
-    task5_calls: list[object] = []
+    provision_calls: list[object] = []
 
     def create_link_after_deepvest(*args, **kwargs):
         execution = real_deepvest(*args, **kwargs)
@@ -792,17 +797,17 @@ def test_tn_root_link_is_refused_before_task5_or_outside_mutation(
             pytest.skip(f"directory symlinks unavailable: {error}")
         return execution
 
-    def unexpected_task5(*_args, **_kwargs):
-        task5_calls.append(object())
+    def unexpected_provision(*_args, **_kwargs):
+        provision_calls.append(object())
         raise AssertionError("Governed provisioning must not receive an escaped path")
 
     monkeypatch.setattr(run_module, "execute_deepvest", create_link_after_deepvest)
-    monkeypatch.setattr(run_module, "provision_tn_flow", unexpected_task5)
+    monkeypatch.setattr(run_module, "provision_tn_flow", unexpected_provision)
 
     with pytest.raises(ValueError, match="outside the run directory"):
         run_first_pass(config)
 
-    assert task5_calls == []
+    assert provision_calls == []
     assert list(outside.iterdir()) == []
     _assert_no_released_outputs(config.run_directory)
 
@@ -983,7 +988,7 @@ def test_deepvest_exception_is_attempted_once_and_stops_before_tn_or_network(
 
 
 @pytest.mark.parametrize("failure", ("malformed-row", "missing-input-kit"))
-def test_invalid_task5_handoff_stops_before_server_and_http(
+def test_invalid_tn_handoff_stops_before_server_and_http(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     finance_bundles: dict[str, Path],
@@ -1786,17 +1791,17 @@ def test_powershell_wrapper_uses_project_command_and_restores_absent_environment
 ) -> None:
     real_project = Path(__file__).resolve().parents[1]
     real_wrapper = real_project / "scripts" / "run-first-pass.ps1"
-    real_command = real_project / ".venv" / "Scripts" / "deepvest-tn.exe"
+    real_command = Path(sys.executable).parent / "deepvest-tn.exe"
     assert real_command.is_file()
 
     workspace = tmp_path / "workspace"
-    project = workspace / "DeepVest-TN-Paper"
+    project = workspace / "application"
     wrapper = project / "scripts" / "run-first-pass.ps1"
     project_command = project / ".venv" / "Scripts" / "deepvest-tn.exe"
     wrapper.parent.mkdir(parents=True)
     project_command.parent.mkdir(parents=True)
-    (workspace / "tn-polars").mkdir(parents=True)
-    (workspace / "tn-llama").mkdir(parents=True)
+    (project / "dependencies" / "tn-polars").mkdir(parents=True)
+    (project / "dependencies" / "tn-llama-client").mkdir(parents=True)
     shutil.copy2(real_wrapper, wrapper)
     shutil.copy2(real_command, project_command)
 
@@ -1823,12 +1828,12 @@ def test_powershell_wrapper_uses_project_command_and_restores_absent_environment
         "            for name in names\n"
         "        },\n"
         "        'key_match': os.environ.get('TN_LLAMA_API_KEY')\n"
-        "        == os.environ.get('TASK7_EXPECTED_KEY'),\n"
+        "        == os.environ.get('WRAPPER_TEST_EXPECTED_KEY'),\n"
         "    }\n"
-        "    Path(os.environ['TASK7_CAPTURE']).write_text(\n"
+        "    Path(os.environ['WRAPPER_TEST_CAPTURE']).write_text(\n"
         "        json.dumps(document), encoding='utf-8'\n"
         "    )\n"
-        "    return int(os.environ.get('TASK7_EXIT_CODE', '0'))\n",
+        "    return int(os.environ.get('WRAPPER_TEST_EXIT_CODE', '0'))\n",
         encoding="utf-8",
     )
 
@@ -1839,8 +1844,8 @@ def test_powershell_wrapper_uses_project_command_and_restores_absent_environment
     fake_command = fake_bin / "deepvest-tn.cmd"
     fake_command.write_text(
         "@echo off\n"
-        "> \"%TASK7_PATH_MARKER%\" echo RAN\n"
-        "> \"%TASK7_PATH_SECRET%\" echo %TN_LLAMA_API_KEY%\n"
+        "> \"%WRAPPER_TEST_PATH_MARKER%\" echo RAN\n"
+        "> \"%WRAPPER_TEST_PATH_SECRET%\" echo %TN_LLAMA_API_KEY%\n"
         "exit /b 0\n",
         encoding="utf-8",
     )
@@ -1873,14 +1878,14 @@ def test_powershell_wrapper_uses_project_command_and_restores_absent_environment
         "    return $result\n"
         "}\n"
         "Clear-Containment\n"
-        "$env:TASK7_CAPTURE = $SuccessCapture\n"
-        "$env:TASK7_EXIT_CODE = '0'\n"
+        "$env:WRAPPER_TEST_CAPTURE = $SuccessCapture\n"
+        "$env:WRAPPER_TEST_EXIT_CODE = '0'\n"
         "& $Wrapper -RunDirectory $RunDirectory "
         "-FeedUrl 'http://127.0.0.1:19082' -LlamaPort 18182\n"
         "$success = Get-Presence\n"
         "Clear-Containment\n"
-        "$env:TASK7_CAPTURE = $FailureCapture\n"
-        "$env:TASK7_EXIT_CODE = '9'\n"
+        "$env:WRAPPER_TEST_CAPTURE = $FailureCapture\n"
+        "$env:WRAPPER_TEST_EXIT_CODE = '9'\n"
         "$failureCaught = $false\n"
         "try {\n"
         "    & $Wrapper -RunDirectory \"$RunDirectory-failure\" "
@@ -1905,9 +1910,9 @@ def test_powershell_wrapper_uses_project_command_and_restores_absent_environment
         {
             "PATH": f"{fake_bin}{os.pathsep}{environment['PATH']}",
             "PYTHONPATH": environment.get("PYTHONPATH", ""),
-            "TASK7_EXPECTED_KEY": sentinel,
-            "TASK7_PATH_MARKER": str(path_marker),
-            "TASK7_PATH_SECRET": str(path_secret),
+            "WRAPPER_TEST_EXPECTED_KEY": sentinel,
+            "WRAPPER_TEST_PATH_MARKER": str(path_marker),
+            "WRAPPER_TEST_PATH_SECRET": str(path_secret),
             "TN_LLAMA_API_KEY": sentinel,
         }
     )
@@ -1981,14 +1986,28 @@ def test_powershell_wrapper_uses_project_command_and_restores_absent_environment
     assert sentinel not in completed.stderr
 
 
+@pytest.fixture()
+def getdata_launcher_project(tmp_path: Path) -> Path:
+    project = tmp_path / "application"
+    script = project / "scripts" / "start-local-getdata.ps1"
+    script.parent.mkdir(parents=True)
+    source = Path(__file__).resolve().parents[1] / "scripts" / script.name
+    shutil.copy2(source, script)
+    venv.EnvBuilder(with_pip=False).create(project / ".venv")
+    return project
+
+
 def test_start_local_getdata_serves_data_and_refuses_outside_or_occupied_launches(
-    tmp_path: Path,
+    tmp_path: Path, getdata_launcher_project: Path,
 ) -> None:
-    script = Path(__file__).resolve().parents[1] / "scripts" / "start-local-getdata.ps1"
-    project_root = script.parent.parent
+    project_root = getdata_launcher_project
+    script = project_root / "scripts" / "start-local-getdata.ps1"
     port = _free_port()
     data_dir = project_root / ".runtime" / "getdata" / f"pytest-{uuid.uuid4().hex}"
     environment = dict(os.environ)
+    source = str(Path(__file__).resolve().parents[1] / "src")
+    environment["PYTHONPATH"] = source + os.pathsep + environment.get("PYTHONPATH", "")
+    pid = None
     try:
         started = subprocess.run(
             [
@@ -1998,13 +2017,14 @@ def test_start_local_getdata_serves_data_and_refuses_outside_or_occupied_launche
             check=False, capture_output=True, text=True, env=environment, timeout=20,
         )
         assert started.returncode == 0, started.stderr
+        pid = int(started.stdout.split("PID: ", 1)[1].split(";", 1)[0])
         assert f"base URL: http://127.0.0.1:{port}" in started.stdout
         assert f"data directory: {data_dir}" in started.stdout
         data_url = f"http://127.0.0.1:{port}/v1/feeds/{POSITIONS_FEED}/data"
         with urllib.request.urlopen(data_url) as response:
             assert response.status == 200
-        pid = int(started.stdout.split("PID: ", 1)[1].split(";", 1)[0])
-        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], check=False, capture_output=True)
+        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], check=True, capture_output=True)
+        pid = None
         assert run_module._loopback_port_is_bindable(port)
 
         outside = tmp_path / "outside"
@@ -2033,6 +2053,8 @@ def test_start_local_getdata_serves_data_and_refuses_outside_or_occupied_launche
         assert blocked.returncode != 0
         assert "already occupied" in blocked.stderr
     finally:
+        if pid is not None:
+            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], check=False, capture_output=True)
         if data_dir.exists():
             shutil.rmtree(data_dir)
         for suffix in (".stdout.log", ".stderr.log"):
@@ -2040,10 +2062,10 @@ def test_start_local_getdata_serves_data_and_refuses_outside_or_occupied_launche
 
 
 def test_start_local_getdata_kills_an_unready_owned_child_and_releases_its_port(
-    tmp_path: Path,
+    tmp_path: Path, getdata_launcher_project: Path,
 ) -> None:
-    script = Path(__file__).resolve().parents[1] / "scripts" / "start-local-getdata.ps1"
-    project_root = script.parent.parent
+    project_root = getdata_launcher_project
+    script = project_root / "scripts" / "start-local-getdata.ps1"
     port = _free_port()
     fake_root = tmp_path / "fake-package" / "deepvest_tn"
     fake_root.mkdir(parents=True)
@@ -2078,10 +2100,10 @@ def test_start_local_getdata_kills_an_unready_owned_child_and_releases_its_port(
 
 
 def test_start_local_getdata_rejects_a_project_junction_that_targets_outside(
-    tmp_path: Path,
+    tmp_path: Path, getdata_launcher_project: Path,
 ) -> None:
-    script = Path(__file__).resolve().parents[1] / "scripts" / "start-local-getdata.ps1"
-    project_root = script.parent.parent
+    project_root = getdata_launcher_project
+    script = project_root / "scripts" / "start-local-getdata.ps1"
     outside = tmp_path / "outside"
     outside.mkdir()
     junction = project_root / ".runtime" / "getdata" / f"pytest-junction-{uuid.uuid4().hex}"

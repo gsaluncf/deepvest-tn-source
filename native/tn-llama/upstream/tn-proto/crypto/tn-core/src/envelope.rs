@@ -59,11 +59,8 @@ pub struct EnvelopeInput<'a> {
     /// Public fields (inserted in iteration order into envelope JSON).
     pub public_fields: Map<String, Value>,
     /// Per-group payloads, pre-rendered as JSON snippets.
-    /// Was `Map<String, Value>` — that paid for a `to_value` tree
-    /// alloc inside the encrypt loop AND a re-serialize inside
-    /// envelope_build (double-walk). The runtime now serializes
-    /// each `GroupPayload` straight to a JSON string at encrypt
-    /// time; envelope_build splices the string in verbatim.
+    /// The runtime serializes each `GroupPayload` during encryption;
+    /// envelope construction inserts that JSON without serializing it again.
     pub group_payloads: BTreeMap<String, String>,
 }
 

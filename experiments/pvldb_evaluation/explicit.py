@@ -3,7 +3,7 @@
 This experiment adapter uses the production Context for admission, decisions,
 monitoring, native decryption/inclusion, publication, and signed records. Only
 the developer surface differs: callers name every contributing handle and
-compute with ordinary str/int arguments inside a trusted, pure callback.
+compute with ordinary string and numeric arguments inside a trusted, pure callback.
 
 The callback must use only its supplied arguments and the declared literals.
 It must not perform I/O, open another value, or return plaintext to a caller.
@@ -28,8 +28,8 @@ Literal operands need the same parameters and descriptors as Context.perform::
 
 Returned handles serve as explicit metadata references for subsequent calls;
 the adapter never invokes their overloaded arithmetic or string operations.
-SQL setup, attestation, final reveal, and the model/report workflow are shared
-unchanged by both comparison modes.
+Both comparison modes use the same SQL setup, attestation, reveal, and
+model/report workflow.
 """
 
 from uuid import uuid4

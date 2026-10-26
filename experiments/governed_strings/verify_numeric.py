@@ -174,7 +174,7 @@ def run(directory, *, storage="sqlite"):
         records = verify_tape(recorder.records(), session=session, expected_writer=session.did,
                               expected_context=recorder.context_id, expected_head=recorder.head,
                               policy=recorder.policy)
-        checks.append('independent signature and record-chain verification')
+        checks.append('native signature and record-chain verification')
         checkpoint = recorder.export(Path(directory) / 'worker-records')
         return {'checks': checks, 'signed_records_verified': len(records), 'checkpoint': checkpoint,
                 'storage': storage,

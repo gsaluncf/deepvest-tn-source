@@ -159,7 +159,7 @@ def _source_ceremony_root(source_log_path: Path) -> Path:
     raise FileNotFoundError(f"TN source ceremony config not found above: {source_log}")
 
 
-def _task5_protected_state(flow: TNFlowResult) -> tuple[tuple[str, Path], ...]:
+def _protected_tn_state(flow: TNFlowResult) -> tuple[tuple[str, Path], ...]:
     output_writer_config = _require_absolute_output(
         flow.output_writer.config_path,
         "TN output writer config",
@@ -217,7 +217,7 @@ def _preflight_submit_paths(
 ) -> tuple[Path, Path, Path]:
     transcript = _require_absolute_output(transcript_path, "HTTP transcript path")
     received = _require_absolute_output(received_output_path, "received-output path")
-    protected = _task5_protected_state(flow)
+    protected = _protected_tn_state(flow)
     reader_dir = dict(protected)["TN output reader directory"]
 
     if _paths_overlap(transcript, received):
@@ -255,7 +255,7 @@ def _preflight_runtime_output_paths(
             if _paths_overlap(left_path, right_path):
                 raise ValueError(f"{left_label} overlaps {right_label}")
 
-    protected = _task5_protected_state(flow)
+    protected = _protected_tn_state(flow)
     for generated_label, generated_path in generated:
         for protected_label, protected_path in protected:
             if _paths_overlap(generated_path, protected_path):
@@ -283,7 +283,7 @@ def _active_output_policy(flow: TNFlowResult) -> dict[str, str]:
     return values
 
 
-def _validate_task5_material(flow: TNFlowResult) -> None:
+def _validate_tn_material(flow: TNFlowResult) -> None:
     adapt_finance_source_record(flow.source_row)
     validate_runtime_reader_material(
         flow.input_reader,
@@ -324,7 +324,7 @@ def write_finance_runtime_config(
     )
     if destination.exists():
         raise FileExistsError(f"refusing to replace runtime config: {destination}")
-    _validate_task5_material(flow)
+    _validate_tn_material(flow)
     model = _require_absolute_file(model_path, "GGUF model")
     server = _require_absolute_file(server_path, "governed llama-server")
     if model.suffix.lower() != ".gguf":

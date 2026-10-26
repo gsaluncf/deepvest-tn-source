@@ -33,7 +33,7 @@ use super::{level_value, log_level, Runtime, RuntimeInitOptions, LOG_LEVEL_THRES
 impl Runtime {
     /// Set the process-wide log-level threshold. Verbs at a lower level
     /// short-circuit before any work happens. Mirrors Python
-    /// `tn.set_level()` and TS `TNClient.setLevel()`. (AVL J3.2.)
+    /// `tn.set_level()` and TS `TNClient.setLevel()`.
     ///
     /// Accepts the four standard names ("debug" / "info" / "warning" /
     /// "error") case-insensitively, plus "warn" as an alias for warning,
@@ -278,11 +278,8 @@ impl Runtime {
         // Seed chain state from the main log and check for a prior
         // ceremony.init. Templated `logs.path` walks every rendered
         // `.ndjson` under the template's parent directory; literal
-        // paths just walk the one file. Wiring the templated seed
-        // closes a silent regression introduced when templated paths
-        // moved off the Python emit path — without it, chained
-        // templated ceremonies reset every event_type's
-        // (sequence, prev_hash) to (1, ZERO) on each restart.
+        // paths scan one file. Seeding preserves each event type's
+        // sequence and previous hash across restarts.
         let mut saw_ceremony_init = if log_path_template.is_templated() {
             seed_chain_from_template(&log_path_template, &chain, &storage)?
         } else {
@@ -503,7 +500,7 @@ impl Runtime {
         }
 
         // Honor an optional yaml `ceremony.log_level` so operators can
-        // bake the threshold into config (AVL J3.2). Programmatic
+        // bake the threshold into config. Programmatic
         // `Runtime::set_level` calls are sticky across re-inits in the
         // same process, so only apply the yaml value when the threshold
         // is still at the floor default (DEBUG).
@@ -546,9 +543,9 @@ impl Runtime {
             // the writer hashes it twice (scalar + public) while
             // spec-correct readers exclude the reserved scalar and hash it
             // once — the two disagree and `tn.ceremony.init` fails
-            // row_hash verify cross-SDK. The admin catalog schema for
-            // tn.ceremony.init was updated to match (no device_identity
-            // field); the reducer reads it from the envelope scalar.
+            // row_hash verification across SDKs. The admin catalog omits
+            // device_identity from the event fields; the reducer reads
+            // it from the envelope scalar.
             init_fields.insert("created_at".into(), serde_json::json!(now));
             if let Err(e) = self.emit("info", "tn.ceremony.init", init_fields) {
                 log::warn!(
@@ -642,17 +639,9 @@ impl Runtime {
         self.agent_policies.as_ref()
     }
 
-    /// Explicit close: flush every open log writer and consume `self`.
+    /// Flush open log writers and consume `self`.
     ///
-    /// Dropping a `Runtime` without calling `close` is fine; `File`'s own
-    /// Drop impl flushes OS buffers. Calling `close` gives you a
-    /// `Result` you can surface if flushing errored.
-    ///
-    /// # Errors
-    ///
-    /// Currently always returns `Ok(())` — the underlying flush is
-    /// best-effort. The `Result` is kept so a future fail-on-flush
-    /// tightening is non-breaking.
+    /// Flush errors are not returned; this method returns `Ok(())`.
     pub fn close(self) -> Result<()> {
         // Hand the LogWriters dispatchers off — for literal paths
         // this flushes the single writer; for templated pools it

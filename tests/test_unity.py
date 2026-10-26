@@ -69,7 +69,18 @@ def reserve_consecutive_port_pair() -> tuple[int, socket.socket]:
 
 
 @pytest.mark.parametrize("occupied_port", ["public", "internal"])
-def test_launcher_rejects_each_unity_port_before_java_launch(occupied_port: str) -> None:
+def test_launcher_rejects_each_unity_port_before_java_launch(
+    occupied_port: str, tmp_path: Path,
+) -> None:
+    unity_root = tmp_path / "unity"
+    server_args = unity_root / "server" / "target" / "server.args"
+    server_args.parent.mkdir(parents=True)
+    server_args.write_text("", encoding="utf-8")
+    launch_marker = tmp_path / "java-started.txt"
+    java_command = tmp_path / "java.cmd"
+    java_command.write_text(
+        f'@echo off\n> "{launch_marker}" echo started\nexit /b 9\n', encoding="utf-8"
+    )
     public_port, internal_socket = reserve_consecutive_port_pair()
     if occupied_port == "public":
         internal_socket.close()
@@ -88,6 +99,10 @@ def test_launcher_rejects_each_unity_port_before_java_launch(occupied_port: str)
                 "Bypass",
                 "-File",
                 str(Path("scripts/start-local-unity.ps1").resolve()),
+                "-UnityRoot",
+                str(unity_root),
+                "-JavaExe",
+                str(java_command),
                 "-Port",
                 str(public_port),
                 "-TimeoutSeconds",
@@ -101,6 +116,7 @@ def test_launcher_rejects_each_unity_port_before_java_launch(occupied_port: str)
         occupied_socket.close()
 
     assert result.returncode != 0
+    assert not launch_marker.exists()
     assert f"{occupied_port} loopback port {expected_port} is already occupied" in (
         result.stdout + result.stderr
     )

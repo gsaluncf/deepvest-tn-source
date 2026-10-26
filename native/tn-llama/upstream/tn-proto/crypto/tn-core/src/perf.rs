@@ -7,17 +7,11 @@
 //! `Mutex<HashMap>` keyed by `&'static str`. Snapshot via
 //! [`snapshot`]; reset via [`reset`].
 //!
-//! Why a Mutex over atomics: the hash map allocation is amortized
-//! across the whole process; per-stage updates are
-//! `lock + insert/update + unlock`, which on Windows is ~80 ns
-//! uncontended (Linux `parking_lot`-style would be similar). Cheap
-//! relative to the kilonanosecond stages we're measuring. Atomics
-//! would be faster but would force us to pre-declare every stage at
-//! compile time, which makes adding new stages annoying.
+//! A mutex protects the shared map while stage names are inserted and
+//! counters are updated. Stage names do not require a fixed compile-time list.
 //!
-//! When disabled the only cost is a single `AtomicBool::load(Relaxed)`
-//! at each [`time_stage`] entry — branch-predicted out for the
-//! disabled path.
+//! When disabled, [`time_stage`] checks the atomic enable flag and calls
+//! the supplied function without reading the clock or recording a duration.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -50,7 +44,7 @@ pub fn init_from_env() {
     ENABLED.store(on, Ordering::Relaxed);
 }
 
-/// `true` if instrumentation was turned on via env. Branchless-friendly.
+/// Whether instrumentation was enabled through the environment.
 #[inline]
 pub fn enabled() -> bool {
     ENABLED.load(Ordering::Relaxed)
@@ -58,9 +52,8 @@ pub fn enabled() -> bool {
 
 /// Time `f`, attributing the elapsed nanoseconds to `stage`.
 ///
-/// When instrumentation is disabled this is just `f()` plus one
-/// atomic-bool load (predicted false). When enabled, two `Instant`
-/// reads and one mutex acquisition per call.
+/// When disabled, call `f()` after checking the enable flag. When enabled,
+/// measure its duration and update the stage counters under a mutex.
 #[inline]
 pub fn time_stage<F, R>(stage: &'static str, f: F) -> R
 where

@@ -1,6 +1,6 @@
 //! Shared test helpers: set up a minimal btn ceremony with publisher + reader roles.
 //!
-//! Reused by runtime_init, emit, read, chain, and close tests (Tasks 21–29).
+//! Shared by runtime_init, emit, read, chain, and close tests.
 
 #![allow(dead_code)] // not all tests use every helper
 

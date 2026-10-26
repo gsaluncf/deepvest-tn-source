@@ -20,10 +20,8 @@ use super::zip_write::validate_tnpkg_body_name;
 use super::{BodyContents, Manifest};
 use crate::{Error, Result};
 
-// Multicodec validation lives in the one strict parser
-// (`crate::trust::parse_ed25519_did_key`) now. Pin at compile time that the
-// prefix this module historically enforced is the prefix the parser enforces,
-// so the two can never drift apart silently.
+// Keep the signing-key prefix consistent with the strict DID parser
+// (`crate::trust::parse_ed25519_did_key`).
 const _: () = assert!(matches!(super::ED25519_MULTICODEC, [0xed, 0x01]));
 
 /// Sign a manifest in place, populating

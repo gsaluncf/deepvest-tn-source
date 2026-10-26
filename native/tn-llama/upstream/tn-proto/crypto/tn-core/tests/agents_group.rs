@@ -1,5 +1,4 @@
-//! Tests for the reserved `tn.agents` group + policy splice (per
-//! 2026-04-25 read-ergonomics spec §2).
+//! Tests for the reserved `tn.agents` group and policy insertion.
 
 #![cfg(feature = "fs")]
 
@@ -112,10 +111,9 @@ fn policy_file_splice_populates_tn_agents_fields() {
 
 #[test]
 fn admin_events_splice_tn_agents_when_policy_covers_them() {
-    // Regression for the 2026-04-25 e2e gap: when an admin verb (e.g.
-    // ``admin_add_recipient``) emits a ``tn.recipient.added`` event whose
+    // When admin_add_recipient emits a tn.recipient.added event whose
     // public_fields already carry the structural data (group, leaf_index,
-    // recipient_did, kit_sha256, cipher), the policy splice MUST still
+    // recipient_did, kit_sha256, cipher), policy insertion must still
     // populate the ``tn.agents`` group block. An LLM runtime watching the
     // admin log would otherwise see an admin event with no instructions.
     let policy = "# TN Agents Policy

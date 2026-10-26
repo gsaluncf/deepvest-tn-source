@@ -1,4 +1,4 @@
-"""Independent verification distinguishes fields sharing one signed publication."""
+"""Offline verification distinguishes fields sharing one signed publication."""
 
 from contextlib import ExitStack
 from collections import Counter

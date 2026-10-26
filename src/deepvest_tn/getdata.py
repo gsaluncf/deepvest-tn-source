@@ -19,7 +19,7 @@ class GetDataConfig:
 
 @dataclass(frozen=True)
 class FeedFetchFact:
-    """Row-free fact recorded for one successfully fetched feed."""
+    """Fetch metadata recorded without including data rows."""
 
     event_name: str
     feed_name: str
@@ -30,7 +30,7 @@ class FeedFetchFact:
 
 @dataclass(frozen=True)
 class FetchedFeed:
-    """Buffered raw NDJSON and its row-free successful-fetch fact."""
+    """Buffered NDJSON and the metadata recorded for its successful fetch."""
 
     feed_name: str
     body: bytes

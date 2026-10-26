@@ -226,10 +226,8 @@ fn ts_tn_agents_pre_encryption_byte_compare() {
 // --------------------------------------------------------------------------
 // Admin events canonical-bytes byte-compare. One entry per admin event_type
 // in the catalog. Pins the canonical encoding for every admin event shape
-// across Python / Rust / TS — this is the matrix that catches drift on
-// list-valued fields, multiline strings, optional ints, etc., which the
-// pre-2026-04-25 fixtures (covering only `payment.completed` +
-// `order.created`) did not exercise.
+// across Python, Rust, and TypeScript, including list-valued fields,
+// multiline strings, and optional integers.
 // --------------------------------------------------------------------------
 
 #[test]

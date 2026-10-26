@@ -13,10 +13,7 @@
 //!   entry needs to be processed per decrypt, regardless of how many
 //!   revoked there are.
 //! - `wire` — Ciphertext + ReaderKit to_bytes / from_bytes.
-//!
-//! Baseline numbers to track over time live in `benches/README.md`.
-//! After the first full run, pin numbers for encrypt at r=0, r=10, r=100
-//! as regression anchors.
+
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use tn_btn::{config::TREE_HEIGHT, Ciphertext, Config, PublisherState, ReaderKit};

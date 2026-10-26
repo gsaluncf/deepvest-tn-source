@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "deepvest-tn"
 version = "0.1.0"
-description = "Existing-workflow DeepVest–TN composition experiment"
+description = "Governed data processing through SQL, Polars, DeepVest, and language models"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "polars==1.39.3",

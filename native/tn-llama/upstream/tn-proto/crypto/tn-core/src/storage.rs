@@ -8,10 +8,8 @@
 //!   JS-host callbacks, then construct `Runtime` via
 //!   [`crate::Runtime::init_with_storage`] passing an `Arc<dyn Storage>`.
 //!
-//! The trait is **synchronous** by design. Node-side adapters wrap
-//! `fs.readFileSync` / `fs.writeFileSync` / etc.; browser-side
-//! adapters need a synchronous shim (in-memory cache loaded at init
-//! time, or SharedArrayBuffer + Atomics.wait for the future).
+//! Storage methods are synchronous. Browser adapters must provide
+//! synchronous access to their data.
 //!
 //! ## Why this exists
 //!
@@ -429,11 +427,8 @@ impl Storage for FsStorage {
     }
 
     fn cas_write(&self, path: &Path, prior: Option<&[u8]>, new: &[u8]) -> io::Result<()> {
-        // Native CAS: acquire the sibling .lock, re-read, compare,
-        // atomic-write. Mirrors the body of
-        // keystore_backend::LocalKeystore::write_state from before the
-        // Storage abstraction landed — that function now delegates
-        // here so wasm consumers can supply their own primitive.
+        // Hold the sibling lock while comparing stored bytes and replacing
+        // the file, so another process cannot overwrite an intervening update.
         let parent = path.parent().unwrap_or(Path::new("."));
         std::fs::create_dir_all(parent)?;
 
@@ -500,7 +495,7 @@ impl Storage for FsStorage {
                 // races: the LogFileWriter's lazy open creates the
                 // dir, but the advisory lock is acquired BEFORE the
                 // writer runs. Creating the dir here makes the lock
-                // open robust to never-seen rendered paths. Cost:
+                // open succeed for paths without a parent directory. Cost:
                 // one create_dir_all per (process, path) — amortized
                 // across all subsequent emits via the cache hit.
                 if let Some(parent) = path.parent() {

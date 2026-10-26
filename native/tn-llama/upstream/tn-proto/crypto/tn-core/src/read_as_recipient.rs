@@ -5,10 +5,7 @@
 //! for a cross-publisher decrypt that bypasses your own ceremony setup.
 //!
 //! Mirrors Python `tn.read_as_recipient(log_path, keystore_dir, group=)`
-//! and TS `readAsRecipient(logPath, keystorePath, opts?)`. Closes the
-//! cross-binding gap surfaced by the cash-register Stage 6 + AVL J7
-//! audits — Rust now has the same direct-decrypt verb its sibling
-//! bindings ship.
+//! and TS `readAsRecipient(logPath, keystorePath, opts?)`.
 //!
 //! Dispatches on the kit file present in `keystore_path`:
 //!
@@ -79,7 +76,7 @@ impl Default for ReadAsRecipientOptions {
 
 /// Iterate decrypted entries from `log_path` using a kit found in
 /// `keystore_path`. Mirrors Python's `tn.read_as_recipient` and TS's
-/// `readAsRecipient`. (AVL J7 / cash-register S6.2 cross-binding port.)
+/// `readAsRecipient`.
 ///
 /// # Errors
 ///
@@ -92,9 +89,8 @@ pub fn read_as_recipient(
     keystore_path: &Path,
     opts: ReadAsRecipientOptions,
 ) -> Result<Vec<ForeignReadEntry>> {
-    // This native verb deliberately runs without a ceremony, so it owns the
-    // storage choice: the `std::fs`-backed adapter. `read_recipient_rows` takes
-    // the adapter as a parameter, so a future wasm binding can pass a JS one.
+    // This native entry point uses FsStorage. read_recipient_rows accepts
+    // the storage adapter explicitly.
     let storage: std::sync::Arc<dyn crate::storage::Storage> =
         std::sync::Arc::new(crate::storage::FsStorage::new());
     let rows = crate::runtime::read_recipient_rows(log_path, keystore_path, &opts.group, &storage)?;

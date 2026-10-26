@@ -99,7 +99,6 @@ def main():
         gateway, worker = context("gateway"), context("worker")
         driver = GovernedSQL(database, gateway=gateway, consumer=worker,
                              edition_publisher=publisher, directory=root / "editions", detect_types=sqlite3.PARSE_DECLTYPES)
-        # This is a real DB-API shaped query, not a list returned by a mock.
         rows = driver.execute("SELECT name, value FROM customer_data LIMIT ?", (2,)).fetchall()
         name, value = rows[0]
         other_name, other_value = rows[1]

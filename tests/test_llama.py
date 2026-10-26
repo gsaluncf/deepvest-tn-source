@@ -43,8 +43,8 @@ def isolated_tn(monkeypatch):
 
 
 @pytest.fixture(scope="module")
-def task5_flow(tmp_path_factory) -> TNFlowResult:
-    root = tmp_path_factory.mktemp("task6-task5-flow")
+def governed_flow(tmp_path_factory) -> TNFlowResult:
+    root = tmp_path_factory.mktemp("llama-governed-flow")
     schema = (
         ("account_id", pl.String),
         ("portfolio_id", pl.String),
@@ -115,8 +115,8 @@ def task5_flow(tmp_path_factory) -> TNFlowResult:
 
 
 @pytest.fixture(scope="module")
-def encrypted_release_body(task5_flow: TNFlowResult) -> bytes:
-    writer = tn.init(task5_flow.output_writer.config_path, link=False, stdout=False)
+def encrypted_release_body(governed_flow: TNFlowResult) -> bytes:
+    writer = tn.init(governed_flow.output_writer.config_path, link=False, stdout=False)
     policy_document = tn.agents.policy()
     assert policy_document is not None
     template = policy_document.templates["report.generated"]
@@ -134,18 +134,18 @@ def encrypted_release_body(task5_flow: TNFlowResult) -> bytes:
             )
         },
         source_lineage={
-            "source_device_identity": task5_flow.source_row.source_writer_did,
-            "source_event_id": task5_flow.source_row.event_id,
+            "source_device_identity": governed_flow.source_row.source_writer_did,
+            "source_event_id": governed_flow.source_row.event_id,
             "source_event_type": "portfolio.deepvest.calculated",
-            "derived_from_row_hash": task5_flow.source_row.row_hash,
-            "source_policy": task5_flow.source_row.policy_reference,
+            "derived_from_row_hash": governed_flow.source_row.row_hash,
+            "source_policy": governed_flow.source_row.policy_reference,
             "selected_sections": ["finance"],
             "operation": "derived_html_report",
         },
     )
     assert emitted is not None
     matches = []
-    for raw in task5_flow.output_writer.log_path.read_bytes().splitlines(keepends=True):
+    for raw in governed_flow.output_writer.log_path.read_bytes().splitlines(keepends=True):
         parsed = json.loads(raw)
         if (
             parsed.get("event_id") == emitted["event_id"]
@@ -158,8 +158,8 @@ def encrypted_release_body(task5_flow: TNFlowResult) -> bytes:
         {
             "protocol": "tn.llama.release.v1",
             "run_id": "run-client-test",
-            "source_event_id": task5_flow.source_row.event_id,
-            "source_row_hash": task5_flow.source_row.row_hash,
+            "source_event_id": governed_flow.source_row.event_id,
+            "source_row_hash": governed_flow.source_row.row_hash,
             "output_event_id": emitted["event_id"],
             "output_row_hash": emitted["row_hash"],
             "output_ndjson": output_ndjson,
@@ -251,7 +251,7 @@ def _replace_wire_envelope(
     )
 
 
-def _clone_task5_flow(flow: TNFlowResult, destination: Path) -> TNFlowResult:
+def _clone_governed_flow(flow: TNFlowResult, destination: Path) -> TNFlowResult:
     paths = (
         flow.source_row.source_log_path,
         flow.marker_free_row.source_log_path,
@@ -318,7 +318,7 @@ def _snapshot_tree(root: Path) -> dict[str, tuple[str, bytes]]:
     return snapshot
 
 
-_TASK5_PROTECTED_CATEGORIES = (
+_PROTECTED_TN_CATEGORIES = (
     "input-reader-kit",
     "input-index-key",
     "input-package",
@@ -336,7 +336,7 @@ _TASK5_PROTECTED_CATEGORIES = (
 )
 
 
-def _task5_protected_target(flow: TNFlowResult, category: str) -> Path:
+def _protected_tn_target(flow: TNFlowResult, category: str) -> Path:
     output_writer_root = flow.output_writer.config_path.parent
     source_root = flow.source_row.source_log_path.parent.parent
     output_keystore = tn.config.load(flow.output_writer.config_path).keystore
@@ -362,7 +362,7 @@ def _task5_protected_target(flow: TNFlowResult, category: str) -> Path:
     return targets[category].resolve(strict=False)
 
 
-def test_finance_adapter_preserves_the_exact_task_5_row(tmp_path: Path) -> None:
+def test_finance_adapter_preserves_the_exact_source_row(tmp_path: Path) -> None:
     model_row = _model_bound_row(tmp_path)
 
     record = adapt_finance_source_record(model_row)
@@ -418,7 +418,7 @@ def test_finance_adapter_rejects_rows_outside_the_finance_profile(
             adapt_finance_source_record(candidate)
 
 
-def test_finance_adapter_rejects_task_5_metadata_or_envelope_mismatch(
+def test_finance_adapter_rejects_source_metadata_or_envelope_mismatch(
     tmp_path: Path,
 ) -> None:
     model_row = _model_bound_row(tmp_path)
@@ -463,7 +463,7 @@ def test_finance_request_uses_the_sibling_closed_wrapper_and_exact_row(
 
 def test_runtime_config_is_the_closed_finance_profile_with_live_material(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
 ) -> None:
     model_path = tmp_path / "model.gguf"
     server_path = tmp_path / "llama-server.exe"
@@ -474,7 +474,7 @@ def test_runtime_config_is_the_closed_finance_profile_with_live_material(
     raw_trace_dir = (tmp_path / "runtime" / "raw-trace").resolve()
 
     written = write_finance_runtime_config(
-        task5_flow,
+        governed_flow,
         config_path=config_path,
         audit_path=audit_path,
         raw_trace_dir=raw_trace_dir,
@@ -515,15 +515,15 @@ def test_runtime_config_is_the_closed_finance_profile_with_live_material(
                 ),
             },
         },
-        "reader_key_dir": str(task5_flow.input_reader.reader_key_dir),
-        "input_index_key_path": str(task5_flow.input_reader.index_key_path),
-        "ceremony_id": task5_flow.input_reader.ceremony_id,
+        "reader_key_dir": str(governed_flow.input_reader.reader_key_dir),
+        "input_index_key_path": str(governed_flow.input_reader.index_key_path),
+        "ceremony_id": governed_flow.input_reader.ceremony_id,
         "governance_group": "tn.agents",
         "input_index_epoch": 0,
-        "output_tn_config_path": str(task5_flow.output_writer.config_path),
-        "output_reader_key_dir": str(task5_flow.output_writer.reader.reader_key_dir),
-        "output_index_key_path": str(task5_flow.output_writer.reader.index_key_path),
-        "output_ceremony_id": task5_flow.output_writer.ceremony_id,
+        "output_tn_config_path": str(governed_flow.output_writer.config_path),
+        "output_reader_key_dir": str(governed_flow.output_writer.reader.reader_key_dir),
+        "output_index_key_path": str(governed_flow.output_writer.reader.index_key_path),
+        "output_ceremony_id": governed_flow.output_writer.ceremony_id,
         "output_governance_group": "tn.agents",
         "output_index_epoch": 0,
         "audit_path": str(audit_path),
@@ -543,10 +543,10 @@ def test_runtime_config_is_the_closed_finance_profile_with_live_material(
 
 def test_runtime_config_reads_the_active_output_tn_policy(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
 ) -> None:
     cloned_writer_root = tmp_path / "output-writer"
-    shutil.copytree(task5_flow.output_writer.config_path.parent, cloned_writer_root)
+    shutil.copytree(governed_flow.output_writer.config_path.parent, cloned_writer_root)
     cloned_config = cloned_writer_root / "tn.yaml"
     policy_path = cloned_writer_root / ".tn" / "config" / "agents.md"
     policy_path.write_text(
@@ -557,11 +557,11 @@ def test_runtime_config_reads_the_active_output_tn_policy(
         encoding="utf-8",
     )
     cloned_output_writer = replace(
-        task5_flow.output_writer,
+        governed_flow.output_writer,
         config_path=cloned_config.resolve(),
         log_path=(cloned_writer_root / ".tn" / "logs" / "tn.ndjson").resolve(),
     )
-    cloned_flow = replace(task5_flow, output_writer=cloned_output_writer)
+    cloned_flow = replace(governed_flow, output_writer=cloned_output_writer)
     model_path = (tmp_path / "model.gguf").resolve()
     server_path = (tmp_path / "llama-server.exe").resolve()
     model_path.write_bytes(b"gguf-model")
@@ -584,15 +584,15 @@ def test_runtime_config_reads_the_active_output_tn_policy(
     )
 
 
-def test_runtime_config_refuses_missing_task_5_reader_material_before_write(
+def test_runtime_config_refuses_missing_tn_reader_material_before_write(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
 ) -> None:
     reader_dir = tmp_path / "input-reader"
-    shutil.copytree(task5_flow.input_reader.reader_key_dir, reader_dir)
+    shutil.copytree(governed_flow.input_reader.reader_key_dir, reader_dir)
     (reader_dir / "finance.btn.mykit").unlink()
-    incomplete_input = replace(task5_flow.input_reader, reader_key_dir=reader_dir.resolve())
-    incomplete_flow = replace(task5_flow, input_reader=incomplete_input)
+    incomplete_input = replace(governed_flow.input_reader, reader_key_dir=reader_dir.resolve())
+    incomplete_flow = replace(governed_flow, input_reader=incomplete_input)
     model_path = (tmp_path / "model.gguf").resolve()
     server_path = (tmp_path / "llama-server.exe").resolve()
     model_path.write_bytes(b"gguf-model")
@@ -625,10 +625,10 @@ def test_runtime_config_refuses_missing_task_5_reader_material_before_write(
 )
 def test_runtime_config_rejects_state_aliases_before_any_filesystem_change(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
     collision: str,
 ) -> None:
-    flow = _clone_task5_flow(task5_flow, tmp_path / "flow")
+    flow = _clone_governed_flow(governed_flow, tmp_path / "flow")
     model_path = (tmp_path / "model.gguf").resolve()
     server_path = (tmp_path / "llama-server.exe").resolve()
     model_path.write_bytes(b"gguf-model")
@@ -664,18 +664,18 @@ def test_runtime_config_rejects_state_aliases_before_any_filesystem_change(
     assert _snapshot_tree(tmp_path) == before
 
 
-@pytest.mark.parametrize("protected_category", _TASK5_PROTECTED_CATEGORIES)
+@pytest.mark.parametrize("protected_category", _PROTECTED_TN_CATEGORIES)
 @pytest.mark.parametrize(
     "generated_field",
     ("runtime-config", "decision-event", "raw-trace"),
 )
-def test_every_task5_protected_category_rejects_every_runtime_output(
+def test_every_protected_tn_category_rejects_every_runtime_output(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
     protected_category: str,
     generated_field: str,
 ) -> None:
-    flow = _clone_task5_flow(task5_flow, tmp_path / "flow")
+    flow = _clone_governed_flow(governed_flow, tmp_path / "flow")
     model_path = (tmp_path / "model.gguf").resolve()
     server_path = (tmp_path / "llama-server.exe").resolve()
     model_path.write_bytes(b"gguf-model")
@@ -685,7 +685,7 @@ def test_every_task5_protected_category_rejects_every_runtime_output(
         tmp_path / "runtime" / "decision-events.ndjson"
     ).resolve()
     raw_trace_dir = (tmp_path / "runtime" / "raw-trace").resolve()
-    protected_target = _task5_protected_target(flow, protected_category)
+    protected_target = _protected_tn_target(flow, protected_category)
 
     if generated_field == "runtime-config":
         config_path = protected_target
@@ -722,10 +722,10 @@ def test_every_task5_protected_category_rejects_every_runtime_output(
 )
 def test_submit_rejects_state_aliases_without_http_or_filesystem_change(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
     collision: str,
 ) -> None:
-    flow = _clone_task5_flow(task5_flow, tmp_path / "flow")
+    flow = _clone_governed_flow(governed_flow, tmp_path / "flow")
     transcript_path = (tmp_path / "client-http.ndjson").resolve()
     received_path = (tmp_path / "received-output.ndjson").resolve()
     output_kit = flow.output_writer.reader.reader_key_dir / "default.btn.mykit"
@@ -762,11 +762,11 @@ def test_submit_rejects_state_aliases_without_http_or_filesystem_change(
 @pytest.mark.parametrize("relative_field", ("transcript", "received-output"))
 def test_submit_requires_absolute_output_paths_before_http_or_write(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
     monkeypatch: pytest.MonkeyPatch,
     relative_field: str,
 ) -> None:
-    flow = _clone_task5_flow(task5_flow, tmp_path / "flow")
+    flow = _clone_governed_flow(governed_flow, tmp_path / "flow")
     transcript_path = (tmp_path / "client-http.ndjson").resolve()
     received_path = (tmp_path / "received-output.ndjson").resolve()
     if relative_field == "transcript":
@@ -790,18 +790,18 @@ def test_submit_requires_absolute_output_paths_before_http_or_write(
     assert _snapshot_tree(tmp_path) == before
 
 
-@pytest.mark.parametrize("protected_category", _TASK5_PROTECTED_CATEGORIES)
+@pytest.mark.parametrize("protected_category", _PROTECTED_TN_CATEGORIES)
 @pytest.mark.parametrize("generated_field", ("transcript", "received-output"))
-def test_every_task5_protected_category_rejects_every_submit_output(
+def test_every_protected_tn_category_rejects_every_submit_output(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
     protected_category: str,
     generated_field: str,
 ) -> None:
-    flow = _clone_task5_flow(task5_flow, tmp_path / "flow")
+    flow = _clone_governed_flow(governed_flow, tmp_path / "flow")
     transcript_path = (tmp_path / "client-http.ndjson").resolve()
     received_path = (tmp_path / "received-output.ndjson").resolve()
-    protected_target = _task5_protected_target(flow, protected_category)
+    protected_target = _protected_tn_target(flow, protected_category)
     if generated_field == "transcript":
         transcript_path = protected_target
     else:
@@ -822,11 +822,11 @@ def test_every_task5_protected_category_rejects_every_submit_output(
     assert _snapshot_tree(tmp_path) == before
 
 
-def test_submit_rejects_a_row_not_selected_from_the_exact_task5_handoff(
+def test_submit_rejects_a_row_not_selected_from_the_exact_governed_handoff(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
 ) -> None:
-    flow = _clone_task5_flow(task5_flow, tmp_path / "flow")
+    flow = _clone_governed_flow(governed_flow, tmp_path / "flow")
     reconstructed_row = replace(flow.source_row)
     before = _snapshot_tree(tmp_path)
 
@@ -847,11 +847,11 @@ def test_submit_rejects_a_row_not_selected_from_the_exact_task5_handoff(
 
 def test_normal_sibling_runtime_and_client_paths_share_one_run_root(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
     encrypted_release_body: bytes,
 ) -> None:
     run_root = tmp_path / "run"
-    flow = _clone_task5_flow(task5_flow, run_root / "task5-state")
+    flow = _clone_governed_flow(governed_flow, run_root / "governed-state")
     model_path = (run_root / "artifacts" / "model.gguf").resolve()
     server_path = (run_root / "artifacts" / "llama-server.exe").resolve()
     model_path.parent.mkdir(parents=True)
@@ -886,14 +886,14 @@ def test_normal_sibling_runtime_and_client_paths_share_one_run_root(
 
 def test_submit_uses_only_the_governed_route_and_returns_verified_release(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
     encrypted_release_body: bytes,
 ) -> None:
     transcript_path = tmp_path / "client-http.ndjson"
     received_path = tmp_path / "received-output.ndjson"
     with _serve_response(encrypted_release_body) as (base_url, requests):
         release = submit_finance_report(
-            task5_flow,
+            governed_flow,
             prompt="Generate the governed portfolio report.",
             base_url=base_url,
             api_key="local-test-key",
@@ -909,7 +909,7 @@ def test_submit_uses_only_the_governed_route_and_returns_verified_release(
     assert len(requests) == 1
     assert requests[0]["path"] == "/v1/tn/chat/completions"
     assert requests[0]["body"] == build_finance_governed_request(
-        task5_flow.source_row,
+        governed_flow.source_row,
         "Generate the governed portfolio report.",
     )
     assert requests[0]["headers"]["Authorization"] == "Bearer local-test-key"
@@ -923,14 +923,14 @@ def test_submit_uses_only_the_governed_route_and_returns_verified_release(
 
 def test_malformed_release_is_rejected_by_the_sibling_parser(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
 ) -> None:
     with (
         _serve_response(b'{"protocol":"tn.llama.release.v1"}') as (base_url, _requests),
         pytest.raises(ValueError, match="exact release shape"),
     ):
         submit_finance_report(
-            task5_flow,
+            governed_flow,
             prompt="Generate the governed portfolio report.",
             base_url=base_url,
             api_key="local-test-key",
@@ -944,7 +944,7 @@ def test_malformed_release_is_rejected_by_the_sibling_parser(
 
 def test_governed_denial_is_returned_once_without_retry_or_substitute(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
 ) -> None:
     denial = b'{"error":{"code":"tn_aad_shape"}}'
     with (
@@ -952,8 +952,8 @@ def test_governed_denial_is_returned_once_without_retry_or_substitute(
         pytest.raises(GovernedRequestDenied) as raised,
     ):
         submit_finance_report(
-            task5_flow,
-            selected_row=task5_flow.marker_free_row,
+            governed_flow,
+            selected_row=governed_flow.marker_free_row,
             prompt="Generate the governed portfolio report.",
             base_url=base_url,
             api_key="local-test-key",
@@ -965,7 +965,7 @@ def test_governed_denial_is_returned_once_without_retry_or_substitute(
     assert raised.value.code == "tn_aad_shape"
     assert len(requests) == 1
     assert requests[0]["body"] == build_finance_governed_request(
-        task5_flow.marker_free_row,
+        governed_flow.marker_free_row,
         "Generate the governed portfolio report.",
     )
     assert not (tmp_path / "received-output.ndjson").exists()
@@ -974,7 +974,7 @@ def test_governed_denial_is_returned_once_without_retry_or_substitute(
 
 def test_sibling_client_refuses_an_encrypted_release_without_an_output_reader(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
     encrypted_release_body: bytes,
 ) -> None:
     transcript = HttpTranscript(tmp_path / "client-http.ndjson")
@@ -988,7 +988,7 @@ def test_sibling_client_refuses_an_encrypted_release_without_an_output_reader(
         with pytest.raises(ValueError, match="requires a TN output reader"):
             client.submit_request(
                 build_finance_governed_request(
-                    task5_flow.source_row,
+                    governed_flow.source_row,
                     "Generate the governed portfolio report.",
                 )
             )
@@ -999,26 +999,26 @@ def test_sibling_client_refuses_an_encrypted_release_without_an_output_reader(
 @pytest.mark.parametrize("kit_state", ["missing", "wrong"])
 def test_missing_or_wrong_output_kit_rolls_back_and_returns_no_release(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
     encrypted_release_body: bytes,
     kit_state: str,
 ) -> None:
     reader_dir = tmp_path / "output-reader"
-    shutil.copytree(task5_flow.output_writer.reader.reader_key_dir, reader_dir)
+    shutil.copytree(governed_flow.output_writer.reader.reader_key_dir, reader_dir)
     default_kit = reader_dir / "default.btn.mykit"
     if kit_state == "missing":
         default_kit.unlink()
     else:
         default_kit.write_bytes(
-            (task5_flow.input_reader.reader_key_dir / "finance.btn.mykit").read_bytes()
+            (governed_flow.input_reader.reader_key_dir / "finance.btn.mykit").read_bytes()
         )
     output_reader = replace(
-        task5_flow.output_writer.reader,
+        governed_flow.output_writer.reader,
         reader_key_dir=reader_dir.resolve(),
     )
     flow = replace(
-        task5_flow,
-        output_writer=replace(task5_flow.output_writer, reader=output_reader),
+        governed_flow,
+        output_writer=replace(governed_flow.output_writer, reader=output_reader),
     )
     received_path = tmp_path / "received-output.ndjson"
     transcript_path = tmp_path / "client-http.ndjson"
@@ -1047,7 +1047,7 @@ def test_missing_or_wrong_output_kit_rolls_back_and_returns_no_release(
 
 def test_fresh_process_opens_the_exact_output_with_only_recipient_kits(
     tmp_path: Path,
-    task5_flow: TNFlowResult,
+    governed_flow: TNFlowResult,
     encrypted_release_body: bytes,
 ) -> None:
     response_path = tmp_path / "release.json"
@@ -1090,7 +1090,7 @@ print(json.dumps({
             "-c",
             script,
             str(response_path),
-            str(task5_flow.output_writer.reader.reader_key_dir),
+            str(governed_flow.output_writer.reader.reader_key_dir),
             str(received_path),
             str(transcript_path),
         ],

@@ -317,7 +317,7 @@ fn absorb_admin_log_snapshot_idempotent() {
 
     let r2 = rt_b.absorb(AbsorbSource::Bytes(&bytes)).unwrap();
     // Second absorb: clock dominates, so noop=true OR accepted=0 with all
-    // deduped. Either is acceptable per the plan.
+    // deduplicated.
     assert!(r2.noop || r2.accepted_count == 0);
 }
 
@@ -385,10 +385,8 @@ fn tampered_manifest_is_rejected() {
 }
 
 #[test]
-fn equivocation_leaf_reuse_is_flagged() {
-    // Producer mints leaf, revokes leaf, then we synthesize a second
-    // tn.recipient.added envelope for the same (group, leaf_index) into a
-    // second ceremony's snapshot and confirm absorb flags it.
+fn snapshot_with_revocation_returns_an_absorb_receipt() {
+    // Export one revoked reader and another reader assigned a distinct leaf.
     let td_a = tempfile::tempdir().unwrap();
     let rt_a = fresh_runtime(&td_a);
     let kit = td_a.path().join("k.btn.mykit");
@@ -397,9 +395,6 @@ fn equivocation_leaf_reuse_is_flagged() {
         .unwrap();
     rt_a.admin_revoke_recipient("default", leaf).unwrap();
 
-    // Mint another recipient — same publisher, but the previous leaf is now
-    // revoked. We craft a synthetic envelope with the *revoked leaf's*
-    // index to force a leaf-reuse attempt on absorb.
     let kit2 = td_a.path().join("k2.btn.mykit");
     let _leaf2 = rt_a
         .admin_add_recipient("default", &kit2, Some("did:key:zRecipient2"))
@@ -416,17 +411,10 @@ fn equivocation_leaf_reuse_is_flagged() {
     )
     .unwrap();
 
-    // Receiver B absorbs cleanly; no leaf-reuse yet (both adds preceded the
-    // revoke in chain order, except the first leaf's add+revoke pair).
+    // Exercise snapshot processing in a separate receiver runtime.
     let td_b = tempfile::tempdir().unwrap();
     let rt_b = fresh_runtime(&td_b);
     let _r = rt_b.absorb(AbsorbSource::Path(out.as_path())).unwrap();
-
-    // Now construct a new snapshot from A that adds another leaf at the
-    // revoked index. This requires emitting a manual envelope. We do this
-    // by synthesizing the file and re-running export. Skipping deep
-    // forgery — this test is satisfied by the cache replay behavior in
-    // admin_cache::tests below. Asserting absence of crash here.
 }
 
 #[test]

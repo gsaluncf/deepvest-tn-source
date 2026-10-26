@@ -105,7 +105,7 @@ pub(crate) fn build_group_states(
 /// The `BtnPublisherCipher` returned for admin still reflects the **current**
 /// state (no reader kit attached; admin only needs the PublisherState).  The
 /// mykit bytes are kept separately so `rebuild_btn_cipher` can re-attach them.
-#[allow(dead_code)] // retained as the non-storage reference impl; init now goes through *_with_storage.
+#[allow(dead_code)] // Filesystem reference implementation; initialization uses *_with_storage.
 pub(crate) fn build_cipher_with_admin(
     spec: &GroupSpec,
     keystore: &Path,
@@ -479,7 +479,7 @@ pub(crate) fn collect_btn_kit_bytes_with_storage(
 /// Rotation preserves previous kits under `.revoked.<ts>` so pre-rotation
 /// entries stay readable. `BtnReaderCipher` tries each kit in order and
 /// the first successful decrypt wins.
-#[allow(dead_code)] // retained as the non-storage reference impl; init now goes through *_with_storage.
+#[allow(dead_code)] // Filesystem reference implementation; initialization uses *_with_storage.
 pub(crate) fn collect_btn_kit_bytes(keystore: &Path, group: &str) -> Result<Vec<Vec<u8>>> {
     let mut kits: Vec<Vec<u8>> = Vec::new();
 
@@ -527,7 +527,7 @@ pub(crate) fn collect_btn_kit_bytes(keystore: &Path, group: &str) -> Result<Vec<
     Ok(kits)
 }
 
-#[allow(dead_code)] // retained as the non-storage reference impl; init now goes through *_with_storage.
+#[allow(dead_code)] // Filesystem reference implementation; initialization uses *_with_storage.
 pub(crate) fn build_btn_cipher_with_admin(
     keystore: &Path,
     group: &str,

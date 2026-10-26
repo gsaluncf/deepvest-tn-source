@@ -1,8 +1,8 @@
-"""tn-proto envelope ride-along for governed releases.
+"""Signed, chained TN envelopes for governed releases.
 
 DeskLedger wraps one tn-proto ceremony (profile ``transaction``) so every
 pipeline boundary can emit a signed, chained, encrypted envelope with one
-call. When an ``agents.md`` policy is supplied, the SDK splices its five
+call. When an ``agents.md`` policy is supplied, the SDK includes its five
 governance fields plus a content-hashed ``policy`` reference into every
 covered event, and routes them into the envelope's encrypted ``tn.agents``
 group. The ``tn`` package is imported lazily so the rest of tn_polars

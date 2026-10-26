@@ -1,4 +1,4 @@
-"""Compatibility import: use TNNumeric for new code."""
+"""Compatibility alias for the governed numeric type, TNNumeric."""
 
 from .numeric import TNNumeric
 

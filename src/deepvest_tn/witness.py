@@ -1,4 +1,4 @@
-"""Independent nine-question evaluation of a completed reference-path run."""
+"""Offline evaluation of nine governance questions from retained run artifacts."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def _status(condition: bool) -> str:
 
 
 def verify_reference_run(run_directory: Path) -> WitnessResult:
-    """Derive nine answers from native artifacts rather than producer assertions."""
+    """Compare the run summary, native events, and recorded request and response bodies."""
     root = Path(run_directory).resolve()
     summary = json.loads((root / "run-summary.json").read_text(encoding="utf-8"))
     runtime = _read_ndjson(root / "runtime" / "decision-events.ndjson")

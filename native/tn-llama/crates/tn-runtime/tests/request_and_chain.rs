@@ -602,7 +602,7 @@ fn accepted(name: &str) -> AcceptedRequest {
         "protocol": "tn.llama.request.v1",
         "tn_row": row,
         "messages": [{"role": "user", "content": "test request"}],
-        "purpose": "task-1-chain-test",
+        "purpose": "chain-verification-test",
         "stream": false,
     });
     let raw = serde_json::to_vec(&request).unwrap();

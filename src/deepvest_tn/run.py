@@ -50,8 +50,6 @@ _STUB_DISCLOSURE = (
     "DeepVest calculations in this first-pass report are deterministic stub outputs, "
     "not live DeepVest results."
 )
-# The installed 0.8B model is used here to exercise the governed emit path, not to support a
-# data-specific narrative-generation claim. A stronger configured model is required for that.
 _FIXED_NARRATIVE_PARAGRAPH = (
     "This first-pass report demonstrates governed transport of supplied portfolio positions "
     "and provided DeepVest stub risk metrics without recalculation; it does not claim "

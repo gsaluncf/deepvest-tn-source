@@ -728,10 +728,8 @@ impl Runtime {
             self.storage.remove(&root_marker).map_err(Error::Io)?;
         }
 
-        // The runtime caches each group cipher at init (see
-        // reload_group_cipher): rebuild NOW or the next emit still seals
-        // under the pre-rotation path. A failed rebuild is a security
-        // failure, not a DX nit — propagate it.
+        // Rebuild the cached group cipher before another emit can seal
+        // under the pre-rotation path. Propagate a failed rebuild.
         self.reload_group_cipher(group)?;
 
         Ok(RotateIdPathResult {
@@ -783,8 +781,7 @@ impl Runtime {
     /// reserved `tn.agents` group, then export a `kit_bundle` `.tnpkg`
     /// at `out_path`.
     ///
-    /// Per the 2026-04-25 read-ergonomics spec §2.8. The `tn.agents`
-    /// group is always implicitly added (de-duplicated if the caller
+    /// The `tn.agents` group is implicitly added (de-duplicated if the caller
     /// passed it). `label` is written to a `.label` sidecar next to the
     /// output `.tnpkg` for downstream identification — best-effort,
     /// never fails the call.
@@ -991,10 +988,10 @@ impl Runtime {
         // mode. The Python BtnGroupCipher caches _last_persisted_bytes
         // for the same reason.
         //
-        // The keystore now routes through `self.storage` so wasm
+        // The keystore routes through `self.storage` so wasm
         // consumers can satisfy these reads + the CAS write below via
         // their `JsStorageAdapter`. Native `FsStorage` retains the
-        // tmp+fsync+rename + flock dance under the hood.
+        // temporary file, fsync, rename, and file-lock sequence.
         let keystore_backend = crate::keystore_backend::LocalKeystore::new(
             self.keystore.clone(),
             self.storage.clone(),
@@ -1020,12 +1017,7 @@ impl Runtime {
         // against. Route through `self.storage.write_bytes` so wasm
         // consumers can satisfy the write via their JS callback set;
         // native `FsStorage::write_bytes` creates parents + writes the
-        // file directly. (We previously used `atomic_write_bytes`
-        // here for the crash-safety tmp+fsync+rename; on native that
-        // guarantee was nice but not load-bearing — a torn `.mykit`
-        // is recoverable by re-running the admin verb. The wasm path
-        // can't realistically replay `fsync` semantics anyway, so
-        // moving to `write_bytes` is the right unification.)
+        // file directly.
         self.storage
             .write_bytes(out_kit_path, &kit_bytes)
             .map_err(Error::Io)?;
@@ -1738,7 +1730,7 @@ impl Runtime {
         state.vault_links = vault_links_by_did.into_values().collect();
 
         // Fallback: derive ceremony from active config when no
-        // tn.ceremony.init landed in the log (the btn case).
+        // tn.ceremony.init is present in the log (the btn case).
         if state.ceremony.is_none() {
             state.ceremony = Some(AdminCeremony {
                 ceremony_id: self.cfg.ceremony.id.clone(),

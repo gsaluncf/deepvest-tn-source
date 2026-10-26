@@ -98,7 +98,6 @@ def _enrol(publisher: tn.TN, recipient: tn.TN, package_path: Path) -> None:
 
 
 def test_governed_tn_object_crosses_two_keyed_processing_boundaries(tmp_path: Path) -> None:
-    """Catches replacing either TN handoff with a plain application DTO."""
     source = _endpoint(tmp_path, "source", ["feed_name", "rows"])
     polars = _endpoint(tmp_path, "polars", ["portfolio_values"])
     deepvest = _endpoint(tmp_path, "deepvest", ["deepvest_result"])
@@ -163,7 +162,6 @@ def test_governed_tn_object_crosses_two_keyed_processing_boundaries(tmp_path: Pa
 def test_deepvest_opens_polars_tn_object_and_seals_its_result_for_llama(
     tmp_path: Path,
 ) -> None:
-    """Catches passing a plain Polars DTO into or out of the DeepVest boundary."""
     polars = _endpoint(tmp_path, "polars", ["portfolio_values"])
     deepvest = _endpoint(
         tmp_path,
@@ -230,7 +228,6 @@ def test_deepvest_opens_polars_tn_object_and_seals_its_result_for_llama(
 def test_polars_opens_source_tn_objects_and_reseals_real_derived_values(
     tmp_path: Path,
 ) -> None:
-    """Catches materializing source rows outside the keyed Polars endpoint."""
     bundles = build_finance_feed_bundles(tmp_path / "bundles")
     registry = LocalRegistry(tmp_path / "registry")
     for feed_name, bundle in bundles.items():
@@ -297,7 +294,6 @@ def test_polars_opens_source_tn_objects_and_reseals_real_derived_values(
 
 
 def test_http_data_service_returns_a_tn_object_with_unity_governance(tmp_path: Path) -> None:
-    """Catches exposing plaintext NDJSON on the governed reference feed route."""
     source = _endpoint(tmp_path, "source", ["feed_name", "rows"])
     polars = _endpoint(tmp_path, "polars", ["portfolio_values"])
     _enrol(source, polars, tmp_path / "packages" / "source-to-polars.tnpkg")
@@ -335,7 +331,6 @@ def test_processing_path_runs_unity_http_polars_and_deepvest_as_tn_objects(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Catches skipping any TN object handoff in the executable processing path."""
     bundles = build_finance_feed_bundles(tmp_path / "bundles")
     unity_locations = {
         f"deepvest.finance.{name.replace('.', '_')}": bundle.resolve().as_uri()
@@ -406,7 +401,6 @@ def test_processing_path_runs_unity_http_polars_and_deepvest_as_tn_objects(
 def test_deepvest_tn_object_is_published_as_tn_llamas_existing_chained_row(
     tmp_path: Path,
 ) -> None:
-    """Catches sending standalone seal wire directly to a chain-only tn-llama runtime."""
     deepvest = _endpoint(
         tmp_path,
         "deepvest",
@@ -459,7 +453,6 @@ def test_reference_path_provisions_each_endpoint_before_the_happy_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Catches replacing endpoint TN packages with request-time authorization."""
     bundles = build_finance_feed_bundles(tmp_path / "bundles")
     unity_locations = {
         f"deepvest.finance.{name.replace('.', '_')}": bundle.resolve().as_uri()

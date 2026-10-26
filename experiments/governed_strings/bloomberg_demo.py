@@ -7,7 +7,6 @@ feed or an interpretation of a vendor license.
 import argparse
 from contextlib import ExitStack, closing
 from datetime import datetime, timezone
-import hashlib
 import importlib.metadata
 import json
 from pathlib import Path
@@ -126,7 +125,7 @@ def main():
             recipient_session=sessions["recipient"], input_config=paths["model-reader"],
             output_config=output_paths["model-writer"], directory=native_dir,
             model=args.model.resolve(), binary=args.binary.resolve(), translate=str if args.native_windows else wsl_path)
-        # Local process transport credential; it is not a new TN key or authority.
+        # Authenticate requests to the local model process.
         api_key = uuid4().hex
         report = None
         try:

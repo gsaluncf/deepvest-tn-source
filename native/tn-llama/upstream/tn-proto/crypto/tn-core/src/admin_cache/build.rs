@@ -31,7 +31,7 @@ impl AdminStateCache {
     ///
     /// Returns [`crate::Error`] only on an unexpected failure constructing the
     /// cache; a missing/unreadable/stale LKV file is handled internally (the
-    /// cache simply starts empty).
+    /// cache starts empty).
     pub fn new(yaml_path: &Path, cfg: Config, log_path: PathBuf) -> Result<Self> {
         let yaml_dir = yaml_path.parent().unwrap_or(Path::new(".")).to_path_buf();
         let admin_log_path = resolve_admin_log_path(&yaml_dir, &cfg);

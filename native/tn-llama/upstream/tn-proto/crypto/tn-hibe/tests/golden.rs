@@ -1,4 +1,4 @@
-//! Golden-vector gate (Phase 2): byte-frozen fixtures for the canonical
+//! Golden fixtures for the canonical
 //! encodings, the identity mapping, BBG decrypt, and the CEK KEM.
 //!
 //! The same assertions run natively (`cargo test`) and under wasm32

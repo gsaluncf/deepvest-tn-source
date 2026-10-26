@@ -25,6 +25,8 @@ from deepvest_tn.getdata import (
     fetch_feed,
 )
 
+_FIXTURE_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "portfolio"
+
 POSITIONS_ROWS = (
     b'{"account_id":"acct-001","portfolio_id":"portfolio-001","symbol":"AAPL","quantity":125,"cost_basis":182.40,"currency":"USD"}\n'
     b'{"account_id":"acct-001","portfolio_id":"portfolio-001","symbol":"MSFT","quantity":80,"cost_basis":412.15,"currency":"USD"}\n'
@@ -61,16 +63,20 @@ def feed_service(tmp_path: Path) -> Iterator[tuple[str, io.StringIO, Path]]:
         yield base_url, events, runtime_data
 
 
-def test_seeding_copies_only_the_two_hand_checked_fixture_files(tmp_path: Path) -> None:
-    # Break caught: a server could read the checked-in fixtures rather than seeded runtime copies.
+def test_seeding_copies_only_the_two_fixture_files(tmp_path: Path) -> None:
     runtime_data = seed_finance_feed_data(tmp_path / "runtime-feed-data")
 
     assert sorted(path.name for path in runtime_data.iterdir()) == [
         "internal_positions.ndjson",
         "market_prices.ndjson",
     ]
-    assert (runtime_data / "internal_positions.ndjson").read_bytes() == POSITIONS_ROWS
-    assert (runtime_data / "market_prices.ndjson").read_bytes() == PRICES_ROWS
+    for filename, expected_rows in (
+        ("internal_positions.ndjson", POSITIONS_ROWS),
+        ("market_prices.ndjson", PRICES_ROWS),
+    ):
+        source_bytes = (_FIXTURE_ROOT / filename).read_bytes()
+        assert source_bytes.splitlines() == expected_rows.splitlines()
+        assert (runtime_data / filename).read_bytes() == source_bytes
 
 
 @pytest.mark.parametrize(
@@ -85,19 +91,24 @@ def test_exact_feed_route_returns_raw_rows_and_client_fact(
     feed_name: str,
     expected_rows: bytes,
 ) -> None:
-    # Break caught: a route could serve the wrong rows, media type, or omit its fetch fact.
-    base_url, events, _runtime_data = feed_service
+    base_url, events, runtime_data = feed_service
+    filename = {
+        "deepvest.internal.positions": "internal_positions.ndjson",
+        "deepvest.market.prices": "market_prices.ndjson",
+    }[feed_name]
+    stored_bytes = (runtime_data / filename).read_bytes()
+    assert stored_bytes.splitlines() == expected_rows.splitlines()
     request_path = f"/v1/feeds/{feed_name}/data"
 
     with urlopen(f"{base_url}{request_path}") as response:
         assert response.status == 200
         assert response.headers["Content-Type"] == "application/x-ndjson; charset=utf-8"
-        assert response.read() == expected_rows
+        assert response.read() == stored_bytes
 
     fetched = fetch_feed(GetDataConfig(base_url=base_url), feed_name)
 
     assert fetched.feed_name == feed_name
-    assert fetched.body == expected_rows
+    assert fetched.body == stored_bytes
     assert fetched.fact.event_name == "getdata.feed_fetched"
     assert fetched.fact.feed_name == feed_name
     assert fetched.fact.request_path == request_path
@@ -123,7 +134,6 @@ def test_exact_feed_route_returns_raw_rows_and_client_fact(
 def test_unknown_or_encoded_traversal_route_returns_not_found(
     feed_service: tuple[str, io.StringIO, Path], path: str
 ) -> None:
-    # Break caught: unrecognized request text could select a data file.
     base_url, _events, _runtime_data = feed_service
 
     with pytest.raises(HTTPError) as caught:
@@ -142,7 +152,6 @@ def test_unknown_or_encoded_traversal_route_returns_not_found(
 def test_post_to_unknown_or_encoded_traversal_route_returns_not_found(
     feed_service: tuple[str, io.StringIO, Path], path: str
 ) -> None:
-    # Break caught: an unknown non-GET path could become a method-not-allowed feed route.
     base_url, _events, _runtime_data = feed_service
     request = Request(f"{base_url}{path}", data=b"", method="POST")
 
@@ -159,7 +168,6 @@ def test_post_to_unknown_or_encoded_traversal_route_returns_not_found(
 def test_post_to_exact_data_route_is_not_allowed(
     feed_service: tuple[str, io.StringIO, Path], feed_name: str
 ) -> None:
-    # Break caught: a data route could accept a method other than GET.
     base_url, _events, _runtime_data = feed_service
     request = Request(
         f"{base_url}/v1/feeds/{feed_name}/data",
@@ -181,7 +189,6 @@ def available_loopback_port() -> int:
 
 
 def test_server_binds_the_requested_nonzero_loopback_port(tmp_path: Path) -> None:
-    # Break caught: server creation could silently ignore the configured caller-selected port.
     requested_port = available_loopback_port()
     runtime_data = seed_finance_feed_data(tmp_path / "runtime-feed-data")
     server = create_feed_server(
@@ -195,7 +202,6 @@ def test_server_binds_the_requested_nonzero_loopback_port(tmp_path: Path) -> Non
 
 
 def test_module_entry_point_seeds_and_serves_the_requested_port(tmp_path: Path) -> None:
-    # Break caught: the module command could fail to seed data or bind its requested port.
     requested_port = available_loopback_port()
     runtime_data = tmp_path / "module-runtime-feed-data"
     environment = os.environ.copy()
@@ -231,8 +237,8 @@ def test_module_entry_point_seeds_and_serves_the_requested_port(tmp_path: Path) 
         else:
             pytest.fail("module entry point did not start the requested server")
 
-        assert (runtime_data / "internal_positions.ndjson").read_bytes() == POSITIONS_ROWS
-        assert (runtime_data / "market_prices.ndjson").read_bytes() == PRICES_ROWS
+        for filename in ("internal_positions.ndjson", "market_prices.ndjson"):
+            assert (runtime_data / filename).read_bytes() == (_FIXTURE_ROOT / filename).read_bytes()
     finally:
         if process.poll() is None:
             process.terminate()
@@ -272,7 +278,6 @@ def test_client_rejects_invalid_http_response(
     exception_type: type[Exception],
     message: str,
 ) -> None:
-    # Break caught: the client could pass through an HTTP error, empty body, or non-NDJSON response.
     FixedResponseHandler.status = status
     FixedResponseHandler.content_type = content_type
     FixedResponseHandler.body = body

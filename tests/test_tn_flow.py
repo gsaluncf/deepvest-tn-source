@@ -92,7 +92,7 @@ def isolated_tn(monkeypatch):
 
 @pytest.fixture(scope="module")
 def finance_bundles(tmp_path_factory) -> dict[str, Path]:
-    return build_finance_feed_bundles(tmp_path_factory.mktemp("task5-finance-bundles"))
+    return build_finance_feed_bundles(tmp_path_factory.mktemp("tn-finance-bundles"))
 
 
 @pytest.fixture()
@@ -598,7 +598,7 @@ def test_marker_free_canonical_row_is_retained_without_tn_aad(tn_flow: TNFlowRes
     assert marker_free.encrypted_groups == ("finance", "tn.agents")
 
 
-def test_exposed_task5_result_is_deeply_immutable_and_contains_no_writer_key(
+def test_exposed_flow_result_is_deeply_immutable_and_contains_no_writer_key(
     tn_flow: TNFlowResult,
 ) -> None:
     with pytest.raises(FrozenInstanceError):

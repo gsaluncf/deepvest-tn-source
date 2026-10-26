@@ -33,8 +33,8 @@ pub struct CoverEntry {
 ///
 /// Self-contained: any reader with an entitled [`ReaderKeyset`] that
 /// matches the `publisher_id` and `epoch` can decrypt without further
-/// publisher state. Wire-format encoding is a follow-on commit; for
-/// now this struct is in-memory only.
+/// publisher state. [`Ciphertext::to_bytes`] and [`Ciphertext::from_bytes`]
+/// encode and decode the wire representation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ciphertext {
     /// Opaque 256-bit publisher identifier. Readers check this matches

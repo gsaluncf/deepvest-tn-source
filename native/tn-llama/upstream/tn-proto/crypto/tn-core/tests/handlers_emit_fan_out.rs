@@ -9,9 +9,7 @@
 //! - panics / errors raised by a handler are logged and swallowed —
 //!   subsequent emits still succeed and downstream handlers still see
 //!   later events.
-//!
-//! Wires into the `Runtime::add_handler` API added 2026-04-25 alongside
-//! the audit fix that wired the fan-out to `Runtime::emit`.
+
 
 #![cfg(feature = "fs")]
 

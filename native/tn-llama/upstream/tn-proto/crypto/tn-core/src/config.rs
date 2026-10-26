@@ -175,9 +175,7 @@ pub struct Ceremony {
     /// Whether each emitted entry is signed by the publisher's Ed25519
     /// device key. `true` (default) produces fully attested logs. `false`
     /// skips the signature step — entries still carry row_hash + prev_hash
-    /// for chain integrity, but lack identity attestation. Useful for
-    /// high-throughput observability flows where batch-signing (RFC
-    /// `2026-04-22-tn-transaction-protocol`) is not yet implemented.
+    /// for chain integrity, but lack identity attestation.
     #[serde(default = "default_sign")]
     pub sign: bool,
     /// Whether to maintain a per-event_type hash chain (sequence +
@@ -194,7 +192,7 @@ pub struct Ceremony {
     /// fresh ceremony.
     #[serde(default = "default_chain")]
     pub chain: bool,
-    /// Active log-level threshold (AVL J3.2). One of "debug" / "info" /
+    /// Active log-level threshold. One of "debug" / "info" /
     /// "warning" / "error", case-insensitive. ``"debug"`` (default)
     /// emits every verb; raising drops lower-priority emits before any
     /// work. Honored at init unless the caller already invoked
@@ -311,8 +309,7 @@ pub struct Device {
 /// Recipient specification inside a group.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GroupRecipient {
-    /// Recipient device identity (`did:key:z…`). Renamed from `did`
-    /// in 0.4.3a1 to match the canonical role vocabulary.
+    /// Recipient device identity (`did:key:z…`).
     #[serde(alias = "did")]
     pub recipient_identity: String,
     /// Reader-key file path (relative to keystore). Written by the legacy
@@ -435,7 +432,7 @@ pub struct Config {
 
 impl Config {
     /// Return the canonical project-level vault view, bridging legacy
-    /// `ceremony.linked_*` fields when the new `vault:` block is absent.
+    /// `ceremony.linked_*` fields when the `vault:` block is absent.
     #[must_use]
     pub fn normalized_vault(&self) -> Vault {
         if self.vault_declared || self.vault.enabled || self.vault.url.is_some() {
@@ -472,7 +469,7 @@ impl Config {
 
     /// Build the inverted multi-group field routing map.
     ///
-    /// The new canonical source of truth is each group's own
+    /// The routing source is each group's own
     /// ``fields:`` list inside ``groups[<g>]``. A field listed under N
     /// groups is encrypted into all N groups' payloads. The returned
     /// list per field is sorted alphabetically + deduplicated so

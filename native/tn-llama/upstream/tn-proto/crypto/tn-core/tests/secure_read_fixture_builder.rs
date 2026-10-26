@@ -1,5 +1,5 @@
 //! Generate the Rust-produced cross-language byte-compare fixtures for
-//! the new `tn.read()` flat shape, `tn.secure_read()` output, and
+//! the `tn.read()` flat shape, `tn.secure_read()` output, and
 //! `tn.agents` group pre-encryption canonical bytes.
 //!
 //! Two fixtures are emitted (mirrored byte-for-byte by the Python + TS

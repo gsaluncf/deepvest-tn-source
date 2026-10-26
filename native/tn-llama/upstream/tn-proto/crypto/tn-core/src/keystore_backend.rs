@@ -23,18 +23,13 @@
 //!    caller can re-read, re-apply their mutation, and retry. This
 //!    prevents the lost-update problem the lock alone wouldn't catch.
 //!
-//! The Python side ships #1 and #3 but says #2 is a "best-effort
-//! under cooperating writers" gap. This Rust implementation closes
-//! that gap.
-//!
 //! ## Storage routing
 //!
-//! `LocalKeystore` now holds an `Arc<dyn Storage>` alongside the
+//! `LocalKeystore` holds an `Arc<dyn Storage>` alongside the
 //! directory root. `read_state` / `write_state` route through the
 //! injected backend rather than calling `std::fs::*` directly. Native
-//! consumers (CLI bin, PyO3 wheel) supply an `FsStorage` and get
-//! byte-for-byte the same behaviour as before — the CAS+lock+atomic-
-//! write dance lives inside `FsStorage::cas_write`. Wasm consumers
+//! consumers (CLI bin, PyO3 wheel) supply an `FsStorage`;
+//! `FsStorage::cas_write` implements locking, comparison, and atomic writes. Wasm consumers
 //! supply a `JsStorageAdapter` and the JS side implements `casWrite`
 //! against whatever primitive their host provides (Node `fs` + manual
 //! tmp+rename, an IndexedDB transaction, etc.). Without this routing
@@ -394,8 +389,7 @@ mod tests {
             h.join().unwrap();
         }
 
-        // End state has exactly the seed plus n appends — every
-        // mutation landed, none were lost.
+        // The stored state must contain the seed and all n appended values.
         let final_state = ks.read_state("default").unwrap().unwrap();
         assert_eq!(
             final_state.len(),

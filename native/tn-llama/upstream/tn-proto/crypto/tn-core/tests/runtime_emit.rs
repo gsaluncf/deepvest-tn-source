@@ -25,9 +25,7 @@ fn emit_writes_one_envelope_line() {
 
     // Verify log file contains two parseable lines:
     // line 0 = tn.ceremony.init (emitted on fresh creation), line 1 = the business event.
-    // Per-row metadata that used to surface via the EmitReceipt is now read
-    // straight off the envelope — emit*() returns Result<()> for cross-language
-    // parity (Python tn.log -> None, TS tn.log -> void).
+    // Read per-row metadata from the envelope; emit*() returns Result<()>.
     let log = rt.log_path().to_path_buf();
     drop(rt);
     let contents = std::fs::read_to_string(&log).unwrap();
@@ -150,13 +148,8 @@ fn protocol_events_route_to_separate_file() {
     assert_eq!(main.lines().count(), 1, "main log should have 1 line");
     assert!(main.contains("order.created"));
     assert!(!main.contains("tn.key.rotate"));
-    // Protocol log should have BOTH `tn.*` events — auto-emitted
-    // `tn.ceremony.init` on fresh init + the `tn.key.rotate` from
-    // this test. Under the corrected `{event_class}` semantic
-    // (first dotted segment), every `tn.*` event_type renders to
-    // the same `protocol/tn.ndjson` file. Under the prior buggy
-    // `nth(1)` semantic these would have landed in `ceremony.ndjson`
-    // and `key.ndjson` respectively.
+    // Both tn.ceremony.init and tn.key.rotate use event_class="tn",
+    // the first dotted segment, and must reach protocol/tn.ndjson.
     assert_eq!(proto.lines().count(), 2);
     assert!(proto.contains("tn.ceremony.init"));
     assert!(proto.contains("tn.key.rotate"));

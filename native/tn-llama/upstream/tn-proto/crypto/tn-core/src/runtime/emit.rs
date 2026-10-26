@@ -619,12 +619,9 @@ impl Runtime {
     /// re-raises the original error after releasing the lock; a read-tail
     /// failure maps straight to an io error.
     ///
-    /// Reverse-scans only the tail window: we care about
-    /// one event_type's tip, not the full tips map, so stopping at the
-    /// first matching row keeps the hot path O(scan-window) rather than the
-    /// prior O(filesize) forward scan. See
-    /// `chain.rs::chain_tip_from_log_tail_reverse` and the S11 stress
-    /// regression that surfaced the issue.
+    /// Scans backward until the first matching event_type, using
+    /// `chain.rs::chain_tip_from_log_tail_reverse`. The work is proportional
+    /// to the bytes scanned between the file end and that row.
     ///
     /// # Panics
     ///
@@ -1054,7 +1051,7 @@ impl Runtime {
             None
         };
 
-        // Log-level filter (AVL J3.2). Drop emits whose level is below
+        // Drop emits whose level is below
         // the active threshold before any work happens. Severity-less
         // ("") always passes — it's an explicit "this is a fact"
         // primitive whose semantics shouldn't depend on the filter.
@@ -1080,8 +1077,7 @@ impl Runtime {
 
         // Splice the `tn.agents` policy text into `fields` for this
         // event_type, if a template is loaded. setdefault semantics — the
-        // caller can override individual fields per-emit. Per 2026-04-25
-        // spec §2.6.
+        // caller can override individual fields per emit.
         self.splice_agent_policy(event_type, &mut fields);
 
         // Catalog check: any tn.* event that's in the catalog must pass schema
@@ -1106,15 +1102,8 @@ impl Runtime {
         let (ts, eid, level_norm) = crate::perf::time_stage("emit:header", || {
             (
                 timestamp.map_or_else(current_timestamp, str::to_string),
-                // UUID v7: time-sortable event_id with a
-                // 48-bit ms timestamp in the high bits. Sorting log
-                // entries by event_id now puts them in chronological
-                // order — drop-in friendly for DB indexes and binary
-                // tree scans. Older event_ids passed in via the
-                // ``event_id`` override (replay, deterministic test
-                // fixtures) still take precedence verbatim, so the
-                // change is transparent to callers who supply their
-                // own ids.
+                // UUID v7 stores a 48-bit millisecond timestamp in the high
+                // bits. An explicit event_id takes precedence for replay.
                 event_id.map_or_else(|| Uuid::now_v7().to_string(), str::to_string),
                 level.to_ascii_lowercase(),
             )
@@ -1153,8 +1142,6 @@ impl Runtime {
             public_out.insert("tn_aad".to_string(), Value::String(s));
         }
 
-        // DX review cross-process emit serialization.
-        //
         // Steps 4–9 (chain advance through chain commit) MUST execute
         // atomically across processes. Otherwise, two workers writing
         // to the same log race on per-process ChainState: both compute
@@ -1163,8 +1150,8 @@ impl Runtime {
         // ``tn.read(verify=True)`` then rejects every branch except
         // the first.
         //
-        // The fix bookends 4–9 with an advisory file lock on a
-        // sentinel adjacent to the write target (main log OR pel for
+        // Hold an advisory file lock during steps 4–9, using a
+        // sentinel adjacent to the write target (main log or PEL for
         // protocol events). Under the lock we refresh ChainState from
         // disk truth for this event_type before advance, then proceed.
         // The lock is released as soon as the row is on disk + chain

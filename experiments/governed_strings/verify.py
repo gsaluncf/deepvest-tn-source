@@ -1,9 +1,10 @@
-"""Independent offline reader of retained native TN publications and evidence.
+"""Offline verification of retained native TN publications and evidence.
 
-No Java connection, publisher state, or mock verifier. Primitive payloads stay
-closed; a retained model report is opened under its independent recipient use.
-The run manifest supplies the separately retained identities and record-chain checkpoints.
-Cryptography establishes attribution and bindings, not the truth of a computation.
+The configured observer checks governance without opening primitive payloads.
+A retained model report is opened under its recipient use. The run manifest
+supplies trusted identities and record-chain checkpoints. No publisher or
+Java connection is needed. Cryptography verifies attribution and bindings;
+it does not establish the truth of a computation.
 """
 
 import argparse

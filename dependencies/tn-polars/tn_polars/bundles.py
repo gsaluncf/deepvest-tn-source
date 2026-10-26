@@ -1,4 +1,4 @@
-"""Directory and ZIP storage for unchanged edition files."""
+"""Directory and ZIP storage that preserves edition file bytes."""
 
 from contextlib import contextmanager
 from dataclasses import dataclass

@@ -78,7 +78,7 @@ class RecordingUnityTransport:
 
 @pytest.fixture(scope="module")
 def finance_bundles(tmp_path_factory) -> dict[str, Path]:
-    return build_finance_feed_bundles(tmp_path_factory.mktemp("task3-finance-bundles"))
+    return build_finance_feed_bundles(tmp_path_factory.mktemp("polars-finance-bundles"))
 
 
 @pytest.fixture()
@@ -98,12 +98,12 @@ def admitted_frames(finance_bundles):
     positions_entry = _load_entry(
         POSITIONS_FEED,
         finance_bundles[POSITIONS_FEED],
-        described_as="Task 3 positions bundle",
+        described_as="Positions bundle",
     )
     prices_entry = _load_entry(
         MARKET_PRICES_FEED,
         finance_bundles[MARKET_PRICES_FEED],
-        described_as="Task 3 market-prices bundle",
+        described_as="Market-prices bundle",
     )
     positions = GovernedPolars.prepare(positions_entry).load(pl.scan_ndjson(POSITIONS_PATH))
     prices = GovernedPolars.prepare(prices_entry).load(pl.scan_ndjson(MARKET_PRICES_PATH))
@@ -239,7 +239,6 @@ def test_stage_resolves_both_governance_entries_before_the_first_data_request(
     finance_feed_service: tuple[str, Path],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Break caught: data could be fetched before the Unity governance bundle is complete.
     import deepvest_tn.polars_stage as polars_stage
 
     feed_url, _data_dir = finance_feed_service
@@ -270,7 +269,6 @@ def test_stage_resolves_both_governance_entries_before_the_first_data_request(
 def test_unity_resolution_failure_makes_zero_data_requests(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Break caught: ordinary data could be requested when its governing bundle is unavailable.
     import deepvest_tn.polars_stage as polars_stage
 
     calls: list[str] = []
@@ -297,7 +295,6 @@ def test_positions_route_serving_prices_is_rejected_by_matching_entry_admission(
     unity_transport: RecordingUnityTransport,
     finance_feed_service: tuple[str, Path],
 ) -> None:
-    # Break caught: cross-feed substitution could otherwise use valid NDJSON under the wrong name.
     feed_url, data_dir = finance_feed_service
     (data_dir / "internal_positions.ndjson").write_bytes(MARKET_PRICES_PATH.read_bytes())
 
@@ -554,7 +551,7 @@ def test_production_stage_does_not_cross_forbidden_boundaries(
     def deny(name: str):
         def denied(*_args, **_kwargs):
             calls.append(name)
-            raise AssertionError(f"Task 3 invoked forbidden boundary {name}")
+            raise AssertionError(f"Polars preparation invoked forbidden boundary {name}")
 
         return denied
 

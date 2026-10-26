@@ -217,7 +217,7 @@ def test_existing_without_rowid_database_stays_readable_and_writable(tmp_path):
 
 
 @pytest.mark.parametrize("backend", ["files", "sqlite"])
-def test_independent_verifier_can_open_storage_read_only(tmp_path, backend):
+def test_verifier_can_open_storage_read_only(tmp_path, backend):
     source = publication()
     with open_publication_store(tmp_path, backend=backend) as store:
         store.put(source)

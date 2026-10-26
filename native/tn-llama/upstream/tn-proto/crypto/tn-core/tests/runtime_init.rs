@@ -166,10 +166,8 @@ fn reload_does_not_re_emit_ceremony_init() {
 
 #[test]
 fn reload_does_not_re_emit_ceremony_init_with_protocol_routing() {
-    // When protocol_events_location routes tn.* events to a separate file,
-    // the main log never receives tn.ceremony.init. A naive !log_path.exists()
-    // fresh-check would falsely detect fresh on reload and re-emit. This test
-    // pins the bug fix.
+    // Reinitialization must find tn.ceremony.init in the separate protocol
+    // log rather than treating an absent main log as an uninitialized runtime.
     let td = tempfile::tempdir().unwrap();
     let cer = common::setup_minimal_btn_ceremony(td.path());
 
@@ -253,13 +251,8 @@ fn reload_does_not_re_emit_ceremony_init_with_protocol_routing() {
 
 #[test]
 fn relative_protocol_events_location_anchors_at_yaml_dir() {
-    // Regression: bug #3 from the e2e conftest workaround. Previously
-    // ``Runtime::resolve_pel`` returned a ``PathBuf`` directly from the
-    // template substitution, so a relative template like
-    // ``./.tn/admin/admin.ndjson`` was resolved against the process cwd,
-    // not the yaml's parent dir. With the fix in place, the admin event
-    // lands in ``<yaml_dir>/.tn/admin/admin.ndjson`` regardless of where
-    // the publisher subprocess was launched from.
+    // Relative protocol-log paths resolve against the YAML directory,
+    // regardless of the publisher process's working directory.
     let td = tempfile::tempdir().unwrap();
     let cer = common::setup_minimal_btn_ceremony(td.path());
 
@@ -291,13 +284,8 @@ fn relative_protocol_events_location_anchors_at_yaml_dir() {
 
 #[test]
 fn yaml_dir_template_keeps_rust_dispatch_active() {
-    // Regression: bug #4 from the e2e conftest workaround. Previously a
-    // template that used ``{yaml_dir}`` could silently kick the Rust path
-    // back to the Python fallback in ``resolve_admin_log_path`` (the
-    // condition ``!pel.contains('{')`` rejected any template). With the
-    // fix, ``{yaml_dir}`` is substituted at config-load time, the
-    // resolved path is treated as a normal absolute path, and the Rust
-    // runtime keeps emitting through the configured admin file.
+    // Resolve {yaml_dir} during configuration loading so admin events
+    // use the resulting absolute path.
     let td = tempfile::tempdir().unwrap();
     let cer = common::setup_minimal_btn_ceremony(td.path());
 

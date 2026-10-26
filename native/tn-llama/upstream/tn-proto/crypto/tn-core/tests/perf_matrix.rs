@@ -259,14 +259,8 @@ fn tn_core_full_ingest_matrix_h8() {
                     assert_eq!(env_prev, prev_hash, "chain break at event {idx}");
                     prev_hash = env_row.to_string();
 
-                    // 7. Decrypt the group we can read — touches btn decrypt + JSON parse.
-                    //    (We use rt.read here-equivalent: just iterate groups and decrypt
-                    //    via the Runtime's cipher. Easiest: call a one-entry read helper.)
-                    //    Hand-roll since Runtime doesn't expose a decrypt-one method yet.
-                    //    Workaround: ask rt to read the whole file each iteration.
-                    //    That's too slow — instead, precompute the decrypts once per
-                    //    REPEATS pass isn't honest. So we DO include the decrypts by
-                    //    doing a fresh rt.read_raw() after the loop and asserting count.
+                    // Decrypt the batch after the chain checks so each timed
+                    // iteration includes one read_raw call.
                 }
                 // Decrypt batch with the Runtime (this is what ingest actually costs):
                 let entries = rt.read_raw().expect("read");

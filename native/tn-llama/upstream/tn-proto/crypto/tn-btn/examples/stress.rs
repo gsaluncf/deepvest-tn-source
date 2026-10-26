@@ -22,9 +22,8 @@
 //!    verify wire format round-trip.
 //! 8. Count successful iterations; abort on any failure.
 //!
-//! Each iteration exercises every subsystem: cover computation, cache,
-//! AEAD, AES-KW, wire format. Failures here mean a real bug; pass
-//! means the library is stable under load.
+//! Each iteration exercises cover computation, the node-key cache, AEAD,
+//! AES-KW, and wire encoding.
 
 use std::env;
 use std::time::{Duration, Instant};

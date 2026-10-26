@@ -5,9 +5,6 @@ use tn_core::admin_catalog::{kind_for, validate_emit, FieldType, CATALOG};
 
 #[test]
 fn catalog_has_thirteen_kinds() {
-    // 10 from the original 2026-04-23 admin-log spec + 2 from the
-    // 2026-04-25 read-ergonomics + agents-group spec
-    // (`tn.agents.policy_published`, `tn.read.tampered_row_skipped`).
     assert_eq!(
         CATALOG.len(),
         13,
@@ -43,7 +40,7 @@ fn every_kind_signs_admin_kinds_sync() {
     for k in CATALOG {
         assert!(k.sign, "{} must sign=true per spec §2.1", k.event_type);
         // tn.read.tampered_row_skipped is the one local-only kind
-        // (per 2026-04-25 spec §3.3 — runtime-private, not federated).
+        // and is not synchronized to other runtimes.
         if k.event_type == "tn.read.tampered_row_skipped" {
             assert!(!k.sync, "tn.read.tampered_row_skipped is local-only");
         } else {

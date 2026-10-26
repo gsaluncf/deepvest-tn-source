@@ -106,12 +106,7 @@ mod tests {
 
     #[test]
     fn triple_outputs_are_stable_within_process() {
-        // Regression anchor: two calls with the same input within one
-        // process must agree. Cross-implementation test vectors (pinned
-        // hex outputs for documented inputs) live in
-        // `tests/test_vectors.rs` once independently computed, per the
-        // design spec §15. They are deliberately NOT generated from this
-        // library's own output — doing so would defeat the point.
+        // Repeated calls with the same input must produce the same output.
         let key = [0u8; KEY_LEN];
         let a = triple_prg(&key);
         let b = triple_prg(&key);

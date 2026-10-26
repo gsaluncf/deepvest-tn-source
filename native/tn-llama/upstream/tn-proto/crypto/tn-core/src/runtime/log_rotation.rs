@@ -341,10 +341,8 @@ pub(crate) fn resolve_pel_static(
         .replace("{yaml_dir}", &yaml_dir_s)
         .replace("{ceremony_id}", ceremony_id)
         .replace("{did}", did);
-    // Anchor relative templates at the yaml dir — same fix as
-    // ``Runtime::resolve_pel``. Without it, fresh-detection scans the
-    // wrong file (process cwd) and we end up emitting tn.ceremony.init
-    // twice on a re-init.
+    // Resolve relative templates against the YAML directory, as in
+    // Runtime::resolve_pel, so reinitialization checks the same admin log.
     let p = PathBuf::from(filled);
     if is_absolute_xplat_path(&p) {
         p

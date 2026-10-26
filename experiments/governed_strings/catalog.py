@@ -10,7 +10,6 @@ from collections import OrderedDict
 import hashlib
 import threading
 import io
-import json
 from pathlib import Path
 from urllib.request import url2pathname
 from urllib.parse import urlparse
@@ -189,7 +188,7 @@ class UnityGovernance:
             self.policy_dag.admit(revision, self.trust.policy_revision)
             revisions.append(revision)
             if definition.get("extend_markdown"):
-                # A real signed policy-history edge, resolved before data origination.
+                # Resolve the signed parent revision before data origination.
                 extended = tn.PolicyRevisionDraft.from_markdown(
                     self.authority, definition["extend_markdown"],
                     scope, VALUE_TYPE, scope).parent(revision.id, tn.PolicyRelation.Extend)

@@ -192,10 +192,7 @@ pub struct Runtime {
     /// of this `Runtime`. Rebuilt only on `Runtime::reload`/re-init
     /// after admin verbs mutate the yaml (e.g. `ensure_group`).
     pub(crate) field_to_groups: BTreeMap<String, Vec<String>>,
-    /// `public_fields` rendered as a HashSet for O(1) membership
-    /// tests. Was previously built every emit
-    /// from the `Vec<String>` in the config; that's wasted
-    /// allocation when the result is invariant per runtime.
+    /// Public field names cached for membership checks during emission.
     pub(crate) public_set: std::collections::HashSet<String>,
     /// Group names whose `policy == "public"` — fields routed to
     /// these groups skip the cipher and land in the envelope as
@@ -228,7 +225,7 @@ impl std::fmt::Debug for Runtime {
 }
 
 /// Standard log-level numeric values, mirroring stdlib Python `logging`.
-/// Used by [`Runtime::set_level`] / [`Runtime::is_enabled_for`] (AVL J3.2).
+/// Used by [`Runtime::set_level`] / [`Runtime::is_enabled_for`].
 pub mod log_level {
     /// DEBUG threshold (10). Lowest level; floor default — emits everything.
     pub const DEBUG: i32 = 10;
@@ -242,7 +239,7 @@ pub mod log_level {
 
 /// Process-wide level threshold. Verbs whose level is below this value
 /// short-circuit before any work happens — no canonicalize, no sign, no
-/// I/O. Default 10 (DEBUG, the floor) so callers see prior behavior;
+/// I/O. Defaults to 10 (DEBUG);
 /// raise via [`Runtime::set_level`]. Static so the early-exit gate is a
 /// single atomic load. Mirrors Python's `_log_level_threshold` and TS's
 /// `TNClient._logLevelThreshold`.
