@@ -75,13 +75,21 @@ Compute and expose are separate operations. For example, an authorized `upper()`
 
 Use Windows and Python 3.12 for the pinned native runtime. Run commands from the repository root in PowerShell.
 
+Automatic Unity installation requires Docker Desktop running Linux containers.
+
+Before running installation or model commands, place the required external files in `.runtime/dependencies/`:
+
+- `tn_proto-2026.9.10b2.dev2-cp39-abi3-win_amd64.whl` for installation.
+- `opa.exe` for SQL/dataframe execution.
+- One compatible `.gguf` model file for report generation.
+
+This directory is excluded from Git. If the native wheel is stored elsewhere, set `TN_WHEEL` to its actual location. The installer checks its SHA-256 against [config/sdk-build.json](config/sdk-build.json), installs the bundled Polars adapter and model-client source, and installs this application.
+
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python scripts/install.py
 ```
-
-Place the supplied native TN wheel in `.runtime/dependencies/`, or set `TN_WHEEL` to its actual location. The installer checks its SHA-256 against [config/sdk-build.json](config/sdk-build.json), installs the bundled Polars adapter and model-client source, and installs this application. The wheel is an external binary dependency; it is not stored in this source repository.
 
 The SQL/dataframe runs also require:
 
@@ -129,13 +137,7 @@ It checks the returned report and pending-review registration.
 Docker Desktop must be running with Linux containers, and WSL must be available
 for the TN-enabled model server. The Unity image is pinned by digest.
 
-Place these external dependencies in `.runtime/dependencies/` under this checkout:
-
-- `tn_proto-2026.9.10b2.dev2-cp39-abi3-win_amd64.whl`
-- `opa.exe`
-- One compatible `.gguf` model file
-
-The directory is excluded from Git. After building the included server, run:
+Use the external files listed in [Setup](#setup). After building the included server, run:
 
 ```powershell
 py -3.12 scripts/run_submission.py --run-directory experiments/results/full-report
@@ -169,10 +171,10 @@ is stopped when the run finishes; its container and data volume are retained.
 The generated report is `report.html` and its review registration is `review.json`
 in the selected run directory. Any failed generation or verification returns an error.
 
-To install and start Unity separately:
+To install and start Unity on the port used by the SQL and numeric examples:
 
 ```powershell
-py -3.12 scripts/install_unity.py --port 18080
+py -3.12 scripts/install_unity.py --port 8080
 ```
 
 The installer pulls the official `unitycatalog/unitycatalog` image, which includes
@@ -220,7 +222,7 @@ To compare explicit input tracking with operator-based tracking, run the same co
 
 ## Commented walkthrough of the paper's example
 
-The following excerpt shows the application calls used by `run_case`. Setup supplies `db`, `context`, and a model endpoint bound to the exact `brief`. The complete executable setup is in [run.py](experiments/pvldb_evaluation/run.py).
+The following excerpt shows the application calls used by `run_case`. Setup supplies `db` and `context`; after the calculation, it configures the model endpoint for the exact `brief`. The complete executable setup is in [run.py](experiments/pvldb_evaluation/run.py).
 
 ```python
 from experiments.pvldb_evaluation.frames import dataframe_calculate
@@ -363,7 +365,7 @@ tn-governed governed-path `
 
 The command creates the example datasets and sessions, resolves their signed records through Unity, performs the join and calculation, runs the native model service, and saves the accepted report. Choose a new run directory for each execution. The command stops its model process when finished. Stop the example Unity container with `docker stop tn-calculation-unity` when you no longer need it.
 
-Inspect `preparation.json` for the calculation and source IDs, `summary.json` for the report ID and accepted policies, and `report.html` for the generated report. `publications/` contains the encrypted, signed objects. Keep the run directory private because it also contains the local session keys.
+Inspect `preparation.json` for the calculation and source IDs, `summary.json` for the report ID and counts of accepted policies and dataset bindings, and `report.html` for the generated report. `publications/` contains the encrypted, signed objects. Keep the run directory private because it also contains the local session keys.
 
 The implementation is in [pipeline.py](src/tn_governed/pipeline.py), [calculation.py](src/tn_governed/calculation.py), and [native_reference.py](src/tn_governed/native_reference.py). The pipeline configures the `work` argument shown above and checks the source policies again before releasing the calculation result.
 
