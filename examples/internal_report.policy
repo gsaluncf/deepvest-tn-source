@@ -1,0 +1,37 @@
+## internal.report
+
+### instruction
+Preserve the source policies, original claims, and input references when producing a result.
+Write a signed monitoring record before each permitted protected operation.
+
+### use_for
+The local-report application may create values, add claims, uppercase names, add numbers,
+concatenate strings, and convert numbers to strings for the internal-report purpose.
+It may expose the result as ordinary text only to internal-console.
+
+### do_not_use_for
+Other applications, purposes, operations, or disclosure destinations.
+
+### consequences
+Keep signed decisions, results, disclosures, and monitoring records.
+Preserving a claim does not require a recipient to accept it.
+
+### on_violation_or_error
+Record the refusal or failure and stop the protected operation.
+
+## operation.records
+
+### instruction
+Retain the endpoint's signed records of decisions and operations in order.
+
+### use_for
+Verification and inspection by this example's enrolled endpoint.
+
+### do_not_use_for
+Treating a recorded claim as an endorsement by another source.
+
+### consequences
+Keep the writer, subject, requested use, and operation identifiable.
+
+### on_violation_or_error
+Refuse records whose signatures, context, or sequence fail verification.

@@ -8,21 +8,66 @@ TN keeps that information connected to individual string and numeric values. A g
 
 ## Quick Start
 
-The application queries governed values, calculates with them, and requests a report:
+Start with a policy supplied by the application owner. This example reads [internal_report.policy](examples/internal_report.policy) from a local file and creates governed values directly in Python. It uses the installed Python package and native TN runtime; Unity, OPA, and a model service are not required.
 
-```python
-rows = db.execute(
-    "SELECT name, value FROM market_data LIMIT 3"
-).fetchall()
-with context:
-    amount = dataframe_calculate(context, rows)
-    brief = rows[0][0] + ": " + amount.as_string()
-# Configure the model endpoint for this completed brief.
-with context:
-    report = endpoint.generate(brief, prompt=PROMPT)
+After the Python installation in [Setup](#setup), run:
+
+```powershell
+python examples/local_policy.py
 ```
 
-Setup supplies `db` and `context`, then configures `endpoint` for the completed `brief`. The context checks operations against the applicable rules and records their outcomes. [The commented example below](#commented-walkthrough-of-the-papers-example) explains each call; [run.py](experiments/pvldb_evaluation/run.py) contains the full setup. In this example, `report.report_html` is the accepted draft and `report.review` identifies the queued review request.
+It prints `ACME: 12.75` and verifies 28 signed records. The complete [local_policy.py](examples/local_policy.py) shows the policy, authorization, publication, and record handling.
+
+The policy allows the `local-report` application to prepare an internal report, requires a signed monitoring record before each protected operation, and permits ordinary-text output only to `internal-console`. The file has a separate policy for the operation records.
+
+The example loads that file and selects its `internal.report` section:
+
+```python
+policy_text = Path(__file__).with_name("internal_report.policy").read_text(encoding="utf-8")
+with tn.Session(
+    policy_text, groups=["values", "evidence"], policy_id="internal_report.policy",
+) as session:
+    policy = session.policy("internal.report")
+```
+
+`session.policy(...)` constructs the governance contract from that section and binds it to the session's signing identity. The application then states which writer, exact policy, operations, and disclosure destination it accepts:
+
+```python
+rules = Rules(
+    writers=frozenset({session.did}),
+    policies=(policy,),
+    operations=frozenset({
+        "select", "attest", "upper", "add", "concat", "to_string", "reveal",
+    }),
+    destinations=frozenset({"internal-console"}),
+)
+```
+
+The policy text records the conditions; the Python evaluator enforces them. In this example it also checks the application and purpose and requires the monitoring action:
+
+```python
+def evaluate(request):
+    if request.application != "local-report" or request.purpose != "internal-report":
+        return Assessment(False, "Application or purpose is not permitted.")
+    decision = rules(request)
+    return replace(decision, obligations=("monitor",)) if decision.permit else decision
+```
+
+The context connects this evaluator to the session and signed recorder. The example's `originate` helper asks it to authorize the local input, records the decision, and calls `Context.originate` with the supplied policy. That call encrypts the value and its governance and publishes the signed result:
+
+```python
+name = originate(context, "ACME", policy, "company name")
+amount = originate(context, Decimal("12.50"), policy, "amount")
+with context:
+    name = name.attest("This name identifies the example company.", context)
+    total = amount + Decimal("0.25")
+    report = name.upper() + ": " + total.as_string()
+text = report.reveal(context, destination="internal-console")
+```
+
+Both values receive the policy explicitly. Their derivatives retain it and the original claim references. The permitted `reveal` returns an ordinary string and records the disclosure.
+
+This example uses one local identity as both publisher and receiver. Its keys and publications exist for the run, and the script verifies the signed records before closing the session. Reusable endpoints load their existing enrollment with `Session.from_config`. In the SQL workflow below, Unity locates signed policy assignments; here the application supplies the policy file directly.
 
 ## SQL-to-report example
 
@@ -56,6 +101,8 @@ The installed `tn_governed.values` package provides `TNString`, `TNNumeric`, `Co
 
 | Source | What to read |
 | --- | --- |
+| [local_policy.py](examples/local_policy.py) | Local policy loading, explicit rules, governed values, and signed records |
+| [internal_report.policy](examples/internal_report.policy) | The conditions supplied by the application owner |
 | [numeric.py](src/tn_governed/values/numeric.py) | Numeric operators and preservation of the underlying Python numeric type |
 | [string.py](src/tn_governed/values/string.py) | Governed string methods, slicing, concatenation and exposure |
 | [primitives.py](src/tn_governed/values/primitives.py) | Authorization, opening values and publishing derived values |
@@ -77,7 +124,7 @@ Use Windows and Python 3.12 for the pinned native runtime. Run commands from the
 
 Automatic Unity installation requires Docker Desktop running Linux containers.
 
-Before running installation or model commands, place the required external files in `.runtime/dependencies/`:
+Place the external files needed by your chosen example in `.runtime/dependencies/`:
 
 - `tn_proto-2026.9.10b2.dev2-cp39-abi3-win_amd64.whl` for installation.
 - `opa.exe` for SQL/dataframe execution.
